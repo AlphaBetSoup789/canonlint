@@ -1,0 +1,17 @@
+# Normalise line endings to LF everywhere, including on Windows checkouts.
+# Without this, git's autocrlf turns every file into CRLF on a Windows runner
+# and `prettier --check` fails on all of them.
+* text=auto eol=lf
+
+# Binary-ish things git should not touch.
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary
+*.db binary
+*.sqlite binary
+*.sqlite3 binary
+
+# Keep generated/vendored files out of language stats and diffs.
+package-lock.json linguist-generated=true -diff
+demo/*.md linguist-documentation=true

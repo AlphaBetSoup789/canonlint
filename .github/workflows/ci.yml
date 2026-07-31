@@ -21,10 +21,14 @@ jobs:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
-        node: ['22.12', '24']
+        # Latest patch of each supported major, not a pinned old patch:
+        # better-sqlite3 compiles from source against the running Node's
+        # headers, so an outdated patch release can fail to load even though
+        # the major is supported.
+        node: ['22', '24']
         include:
-          # better-sqlite3 is a native module — prove the prebuilds resolve on
-          # the platforms writers actually use, not just on Linux CI.
+          # better-sqlite3 is a native module with no prebuilt binaries — prove
+          # it compiles on the platforms writers actually use, not just Linux.
           - os: macos-latest
             node: '24'
           - os: windows-latest
@@ -39,6 +43,11 @@ jobs:
           cache: npm
 
       - run: npm ci
+
+      # A native module that fails to load crashes the vitest worker with an
+      # opaque "Worker exited unexpectedly". Surface it here instead.
+      - name: Verify the native SQLite binding loads
+        run: node -e "const D=require('better-sqlite3');const d=new D(':memory:');d.exec('create table t(x)');console.log('better-sqlite3 ok on node '+process.version+', sqlite '+d.prepare('select sqlite_version() v').get().v)"
 
       - name: Lint
         run: npm run lint
