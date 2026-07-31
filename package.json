@@ -1,0 +1,77 @@
+{
+  "name": "canonlint",
+  "version": "0.1.0",
+  "description": "A continuity engine and linter for fictional universes. Build a canon database from your stories, then lint new drafts against it.",
+  "license": "Apache-2.0",
+  "author": "AlphaBetSoup789",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AlphaBetSoup789/canonlint.git"
+  },
+  "homepage": "https://github.com/AlphaBetSoup789/canonlint#readme",
+  "bugs": {
+    "url": "https://github.com/AlphaBetSoup789/canonlint/issues"
+  },
+  "keywords": [
+    "continuity",
+    "canon",
+    "linter",
+    "writing",
+    "fiction",
+    "worldbuilding",
+    "cli"
+  ],
+  "type": "module",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "bin": {
+    "canonlint": "dist/cli.js"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "dev": "tsx src/cli.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.115.0",
+    "better-sqlite3": "^13.0.2",
+    "commander": "^15.0.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^26.1.2",
+    "eslint": "^10.8.0",
+    "prettier": "^3.9.6",
+    "tsx": "^4.23.1",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.65.0",
+    "vitest": "^4.1.10"
+  },
+  "allowScripts": {
+    "better-sqlite3@13.0.2": true,
+    "esbuild@0.28.1": true
+  }
+}

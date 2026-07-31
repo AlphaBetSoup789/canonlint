@@ -1,0 +1,56 @@
+name: False positive or missed contradiction
+description: canonlint flagged something it shouldn't have, or missed something it should have caught
+labels: [precision]
+body:
+  - type: markdown
+    attributes:
+      value: >
+        Precision is the product's whole value proposition: a flag only ships
+        if the adjudicator can cite the exact canon excerpt it contradicts, and
+        anything uncertain belongs in "Uncertain" rather than "Contradictions".
+        Reports like this are the most useful kind of issue for this project.
+
+
+        **Please use public-domain text in your example** (Sherlock Holmes is
+        ideal) or paraphrase. Do not paste passages from a copyrighted work.
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Which is it?
+      options:
+        - False positive — flagged as a contradiction but is not one
+        - Missed — a real contradiction that was not caught
+        - Miscategorised — should have been "Uncertain", not "Contradiction"
+    validations:
+      required: true
+
+  - type: textarea
+    id: canon
+    attributes:
+      label: The canon claim
+      description: What canonlint thought was established, and the excerpt it cited.
+    validations:
+      required: true
+
+  - type: textarea
+    id: draft
+    attributes:
+      label: The draft passage
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What should have happened, and why
+    validations:
+      required: true
+
+  - type: input
+    id: model
+    attributes:
+      label: Provider and model
+      placeholder: 'e.g. anthropic / claude-sonnet-5'
+    validations:
+      required: true

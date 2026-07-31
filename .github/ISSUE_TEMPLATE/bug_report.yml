@@ -1,0 +1,75 @@
+name: Bug report
+description: Something behaves incorrectly
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: >
+        Before filing: this is a low-maintenance project and issues may sit for
+        a while. PRs get looked at sooner than reports.
+
+
+        **Do not paste text from a copyrighted work.** If you need to show a
+        passage, use a short public-domain example or paraphrase.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What did you expect, and what did you get instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. canonlint init
+        2. canonlint ingest ...
+        3. ...
+      render: shell
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: canonlint version
+      placeholder: 'output of `canonlint --version`'
+    validations:
+      required: true
+
+  - type: dropdown
+    id: provider
+    attributes:
+      label: Provider
+      options:
+        - anthropic
+        - ollama
+        - other / not applicable
+    validations:
+      required: true
+
+  - type: input
+    id: model
+    attributes:
+      label: Model
+      placeholder: 'e.g. claude-sonnet-5, llama3.1:8b'
+
+  - type: input
+    id: env
+    attributes:
+      label: OS and Node version
+      placeholder: 'e.g. macOS 15.3, Node 22.14'
+    validations:
+      required: true
+
+  - type: textarea
+    id: output
+    attributes:
+      label: Output
+      description: >
+        Re-run with `CANONLINT_DEBUG=1` for a stack trace. Scrub any API key
+        before pasting.
+      render: shell

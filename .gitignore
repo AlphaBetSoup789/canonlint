@@ -1,0 +1,25 @@
+# Canon databases are ALWAYS local. Never commit a canon DB — it contains
+# verbatim excerpts from the ingested corpus, which may be copyrighted.
+.canonlint/
+*.canonlint.db
+*.canonlint.db-wal
+*.canonlint.db-shm
+
+# Private strategy doc: success gates, budget, monetisation thinking.
+# Kept locally so agent sessions can read it; never published.
+BUILD_PLAN.md
+
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+
+.env
+.env.*
+!.env.example
+
+.DS_Store
+Thumbs.db
+
+.idea/
+.vscode/

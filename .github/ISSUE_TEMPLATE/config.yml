@@ -1,0 +1,17 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Question or idea
+    url: https://github.com/AlphaBetSoup789/canonlint/discussions
+    about: >
+      Questions, ideas, and "how do I..." belong in Discussions rather than
+      Issues. You'll usually get an answer faster there, and it keeps the issue
+      tracker to actionable work.
+  - name: Security vulnerability
+    url: https://github.com/AlphaBetSoup789/canonlint/security/advisories/new
+    about: >
+      Report privately — especially for prompt-injection escapes. Please do not
+      open a public issue.
+  - name: Read the maintenance posture first
+    url: https://github.com/AlphaBetSoup789/canonlint#support--maintenance
+    about: >
+      This is a low-maintenance project. Issues may sit. Forking is encouraged.

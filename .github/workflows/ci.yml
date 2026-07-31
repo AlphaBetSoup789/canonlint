@@ -1,0 +1,110 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: lint · typecheck · test (node ${{ matrix.node }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest]
+        node: ['22.12', '24']
+        include:
+          # better-sqlite3 is a native module — prove the prebuilds resolve on
+          # the platforms writers actually use, not just on Linux CI.
+          - os: macos-latest
+            node: '24'
+          - os: windows-latest
+            node: '24'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      - run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Check formatting
+        run: npm run format:check
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      # No secrets are configured for this workflow, so a test that reaches the
+      # network or needs an API key fails here rather than in someone's fork.
+      - name: Test
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+      - name: Smoke-test the built CLI
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/smoke"
+          cd "$RUNNER_TEMP/smoke"
+          node "$GITHUB_WORKSPACE/dist/cli.js" init
+          node "$GITHUB_WORKSPACE/dist/cli.js" stats
+          node "$GITHUB_WORKSPACE/dist/cli.js" stats --json | node -e '
+            let raw = "";
+            process.stdin.on("data", (c) => (raw += c));
+            process.stdin.on("end", () => {
+              const stats = JSON.parse(raw);
+              if (stats.schemaVersion !== stats.latestSchemaVersion) {
+                throw new Error("schema version mismatch after init");
+              }
+              if (stats.claims !== 0 || stats.works !== 0) {
+                throw new Error("fresh database is not empty");
+              }
+              console.log("smoke ok: schema v" + stats.schemaVersion);
+            });
+          '
+
+  no-corpus:
+    name: no corpus or canon database committed
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Constraint 1: never ship a canon database, and never commit corpus text
+      # that is not public domain. A tracked .canonlint/ or *.db is a hard fail.
+      - name: Reject tracked canon databases
+        run: |
+          set -euo pipefail
+          if git ls-files | grep -E '(^|/)\.canonlint/|\.db$|\.sqlite3?$' ; then
+            echo "::error::A canon database or .canonlint/ directory is tracked in git."
+            echo "Canon databases contain verbatim excerpts and must stay local."
+            exit 1
+          fi
+          echo "No canon databases tracked."
+
+      - name: Warn on large text files outside demo/
+        run: |
+          set -euo pipefail
+          large=$(git ls-files -- '*.txt' '*.md' \
+            | grep -vE '^(demo/|docs/)' \
+            | xargs -r -I{} sh -c 'test $(wc -c < "{}") -gt 200000 && echo "{}"' || true)
+          if [ -n "$large" ]; then
+            echo "::warning::Large text files added outside demo/ — confirm they are public domain:"
+            echo "$large"
+          fi
