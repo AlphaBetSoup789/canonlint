@@ -438,6 +438,23 @@ export function findLatestRun(db: Db, kind?: Run['kind']): Run | undefined {
     Run | undefined;
 }
 
+/**
+ * Latest run of a given kind against a specific target (e.g. the same
+ * resolved draft path). Prevents `merge` from picking up another draft's
+ * check run just because it happened to run more recently.
+ */
+export function findLatestRunByTarget(
+  db: Db,
+  kind: Run['kind'],
+  target: string,
+): Run | undefined {
+  return db
+    .prepare(
+      'SELECT * FROM runs WHERE kind = ? AND target = ? ORDER BY id DESC LIMIT 1',
+    )
+    .get(kind, target) as Run | undefined;
+}
+
 export interface ConflictQuery {
   runId?: number;
   kind?: Conflict['kind'];

@@ -60,8 +60,11 @@ export interface IngestResult {
 async function reviewProposedClaims(
   db: Db,
   prompt: (question: string) => Promise<string>,
+  claimIds: ReadonlySet<number>,
 ): Promise<{ promoted: number; rejected: number }> {
-  const proposed = findClaims(db, { status: 'proposed' });
+  const proposed = findClaims(db, { status: 'proposed' }).filter((c) =>
+    claimIds.has(c.id),
+  );
   let promoted = 0;
   let rejected = 0;
 
@@ -161,6 +164,7 @@ export async function runIngest(options: IngestOptions): Promise<IngestResult> {
 
     let usage: TokenUsage = extractUsage;
     const entityIds = new Set<number>();
+    const insertedClaimIds = new Set<number>();
     let sourcesInserted = 0;
     let claimsInserted = 0;
     let claimsCanon = 0;
@@ -193,7 +197,7 @@ export async function runIngest(options: IngestOptions): Promise<IngestResult> {
           ? 'canon'
           : 'proposed';
 
-      insertClaim(db, {
+      const inserted = insertClaim(db, {
         entity_id: resolved.entity.id,
         attribute: claim.attribute,
         value: claim.value,
@@ -204,6 +208,7 @@ export async function runIngest(options: IngestOptions): Promise<IngestResult> {
         valid_from: claim.valid_from ?? null,
         valid_until: claim.valid_until ?? null,
       });
+      insertedClaimIds.add(inserted.id);
       claimsInserted += 1;
       if (status === 'canon') claimsCanon += 1;
       else claimsProposed += 1;
@@ -222,7 +227,7 @@ export async function runIngest(options: IngestOptions): Promise<IngestResult> {
         reviewRl = createInterface({ input, output });
         prompt = (question: string) => reviewRl!.question(question);
       }
-      const reviewed = await reviewProposedClaims(db, prompt);
+      const reviewed = await reviewProposedClaims(db, prompt, insertedClaimIds);
       claimsCanon += reviewed.promoted;
       claimsProposed -= reviewed.promoted + reviewed.rejected;
       claimsRejected = reviewed.rejected;

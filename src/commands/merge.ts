@@ -1,7 +1,9 @@
+import { resolve } from 'node:path';
 import { loadConfig, type ConfigOverrides } from '../config.js';
 import { openDb } from '../db/index.js';
 import {
-  findLatestRun,
+  findEntityByNameOrAlias,
+  findLatestRunByTarget,
   getEntity,
   getRun,
   insertClaim,
@@ -23,7 +25,7 @@ import { log, style } from '../util/logger.js';
 export interface MergeOptions extends ConfigOverrides {
   draft: string;
   cwd?: string;
-  /** Merge new facts from this check run id (default: latest check). */
+  /** Merge new facts from this check run id (default: latest check run for this draft). */
   runId?: number;
   /** Keep claims as proposed instead of promoting to canon. */
   proposed?: boolean;
@@ -52,6 +54,7 @@ export function runMerge(options: MergeOptions): MergeResult {
   const paths = requireProject(options.cwd);
   loadConfig(paths, options);
 
+  const draftPath = resolve(options.draft);
   const db = openDb(paths.dbPath, { mustExist: true });
   try {
     let checkRunId: number;
@@ -62,10 +65,14 @@ export function runMerge(options: MergeOptions): MergeResult {
       }
       checkRunId = run.id;
     } else {
-      const latest = findLatestRun(db, 'check');
+      // Match on the resolved draft path, not just "most recent check run" —
+      // otherwise merging draft A can silently promote draft B's new facts
+      // if B was checked more recently.
+      const latest = findLatestRunByTarget(db, 'check', draftPath);
       if (!latest) {
         throw new CanonlintError(
-          'No check run found. Run `canonlint check <draft>` first.',
+          `No check run found for ${options.draft}. Run ` +
+            '`canonlint check <draft>` first, or pass --run <id>.',
         );
       }
       checkRunId = latest.id;
@@ -81,7 +88,7 @@ export function runMerge(options: MergeOptions): MergeResult {
     const work = upsertWork(db, { title: workTitle });
     const mergeRun = insertRun(db, {
       kind: 'merge',
-      target: options.draft,
+      target: draftPath,
       model: 'n/a',
       stats: { status: 'running', fromCheckRun: checkRunId },
     });
@@ -89,6 +96,10 @@ export function runMerge(options: MergeOptions): MergeResult {
     let promoted = 0;
     let skipped = 0;
     const status = options.proposed ? 'proposed' : 'canon';
+    // Entities created for unresolved draft names during this merge, keyed by
+    // "name|kind" (lowercase) so repeated new facts about the same new
+    // character reuse one row instead of colliding on the UNIQUE constraint.
+    const createdThisRun = new Map<string, number>();
 
     for (const conflict of openNewFacts) {
       let draft: DraftClaimPayload;
@@ -121,12 +132,31 @@ export function runMerge(options: MergeOptions): MergeResult {
           updateConflictVerdict(db, conflict.id, 'dismissed');
           continue;
         }
-        const created = insertEntity(db, {
-          name: draft.entity_name,
-          kind: draft.entity_kind,
-          aliases: draft.entity_aliases ?? [],
-        });
-        entityId = created.id;
+        const cacheKey = `${draft.entity_name.toLowerCase()}|${draft.entity_kind}`;
+        const cached = createdThisRun.get(cacheKey);
+        if (cached !== undefined) {
+          entityId = cached;
+        } else {
+          // Another check run (or this one, on an earlier conflict) may have
+          // already created this entity — never insert blind, the (name,kind)
+          // unique constraint would abort the whole merge on a duplicate.
+          const existing = findEntityByNameOrAlias(
+            db,
+            draft.entity_name,
+            draft.entity_kind,
+          );
+          if (existing) {
+            entityId = existing.id;
+          } else {
+            const created = insertEntity(db, {
+              name: draft.entity_name,
+              kind: draft.entity_kind,
+              aliases: draft.entity_aliases ?? [],
+            });
+            entityId = created.id;
+          }
+          createdThisRun.set(cacheKey, entityId);
+        }
       }
 
       const source = insertSource(db, {

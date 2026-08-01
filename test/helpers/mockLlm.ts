@@ -1,6 +1,40 @@
 import { MockProvider } from '../../src/llm/mock.js';
 import { miniExtractResponse } from '../fixtures/mini-claims.js';
 import type { ExtractedClaim } from '../../src/ingest/extract.js';
+import type { LlmProvider, TokenUsage } from '../../src/llm/types.js';
+
+/**
+ * Wraps a provider with a non-zero `costOf`, so tests can exercise the
+ * running spend-cap check without depending on real Anthropic pricing.
+ */
+export class CostedProvider implements LlmProvider {
+  readonly name: string;
+  readonly model: string;
+  readonly enforcesSchema: boolean;
+  private readonly inner: LlmProvider;
+  private readonly usdPerCall: number;
+  calls = 0;
+
+  constructor(inner: LlmProvider, usdPerCall: number) {
+    this.inner = inner;
+    this.name = inner.name;
+    this.model = inner.model;
+    this.enforcesSchema = inner.enforcesSchema;
+    this.usdPerCall = usdPerCall;
+  }
+
+  complete: LlmProvider['complete'] = async (request) => {
+    this.calls += 1;
+    return this.inner.complete(request);
+  };
+
+  costOf(usage: TokenUsage): number {
+    // Flat per-call charge regardless of token usage — keeps the test's
+    // spend math simple and independent of prompt length.
+    void usage;
+    return this.calls * this.usdPerCall;
+  }
+}
 
 /** Shared entity-resolution responder used by ingest + check tests. */
 export function resolveResponder(req: { user: string }): string | null {

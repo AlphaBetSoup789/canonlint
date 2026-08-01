@@ -93,14 +93,37 @@ export async function runCheck(options: CheckOptions): Promise<CheckResult> {
     let entitiesUnresolved = 0;
     let claimsChecked = 0;
 
+    /**
+     * Resolution + adjudication call the model per draft claim, so the
+     * preflight extraction-only estimate can be exceeded mid-run. Re-check
+     * actual spend as we go and abort rather than silently blow the cap.
+     */
+    const assertWithinSpendCap = (): void => {
+      const spentSoFar = llm.costOf(usage);
+      if (spentSoFar > cfg.maxSpendUsd) {
+        updateRunStats(db, run.id, {
+          status: 'aborted_spend_cap',
+          claimsChecked,
+          estimatedUsd: estimate.usd,
+          actualUsd: spentSoFar,
+          usage,
+          warnings,
+        });
+        throw new SpendCapError(spentSoFar, cfg.maxSpendUsd);
+      }
+    };
+
     for (const draftClaim of extracted) {
       const resolved = await resolveEntity(db, llm, {
         name: draftClaim.entity_name,
         kind: draftClaim.entity_kind,
         aliases: draftClaim.entity_aliases,
         createIfMissing: false,
+        // Linting a draft must not have side effects on canon — no alias writes.
+        mutate: false,
       });
       usage = addUsage(usage, resolved.usage);
+      assertWithinSpendCap();
 
       if (!resolved.entity) {
         entitiesUnresolved += 1;
@@ -148,6 +171,7 @@ export async function runCheck(options: CheckOptions): Promise<CheckResult> {
         candidates,
       });
       usage = addUsage(usage, adjUsage);
+      assertWithinSpendCap();
       if (parseError) {
         warnings.push(
           `Adjudication parse error for ${entity.name}.${draftClaim.attribute}: ${parseError}`,

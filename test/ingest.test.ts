@@ -8,6 +8,7 @@ import { runEntity } from '../src/commands/entity.js';
 import { openDb } from '../src/db/index.js';
 import {
   findCitedClaims,
+  findClaims,
   findEntityByNameOrAlias,
   getEntityAliases,
   getStats,
@@ -180,6 +181,96 @@ describe('runIngest', () => {
 
     expect(result.claimsCanon).toBe(1);
     expect(result.claimsRejected).toBe(0);
+  });
+
+  it('--review only prompts for claims from the current run, not stale proposed claims', async () => {
+    // Seed a low-confidence proposed claim from an earlier ingest.
+    const earlierStory = join(dir, 'earlier.md');
+    writeFileSync(earlierStory, 'Someone said something once.\n', 'utf8');
+    await runIngest({
+      cwd: dir,
+      path: earlierStory,
+      work: 'Earlier Work',
+      llm: new MockProvider({
+        responder: (req) => {
+          if (req.user.includes('entity resolution')) {
+            return JSON.stringify({ match: 'new', canonical_name: 'Old Ghost' });
+          }
+          return JSON.stringify({
+            claims: [
+              {
+                entity_name: 'Old Ghost',
+                entity_kind: 'character',
+                entity_aliases: [],
+                attribute: 'nature',
+                value: 'unclear',
+                modality: 'believed',
+                confidence: 0.3,
+                evidence_quote: 'Someone said something once.',
+                valid_from: null,
+                valid_until: null,
+              },
+            ],
+          });
+        },
+      }),
+      maxSpendUsd: 1,
+    });
+
+    const storyPath = writeMiniStory();
+    let promptCalls = 0;
+    const llm = new MockProvider({
+      responder: (req) => {
+        if (req.user.includes('entity resolution')) {
+          return JSON.stringify({ match: 'new', canonical_name: 'Adrian Voss' });
+        }
+        return JSON.stringify({
+          claims: [
+            {
+              entity_name: 'Adrian Voss',
+              entity_kind: 'character',
+              entity_aliases: [],
+              attribute: 'occupation',
+              value: 'consulting detective',
+              modality: 'asserted',
+              confidence: 0.5,
+              evidence_quote: 'consulting detective',
+              valid_from: null,
+              valid_until: null,
+            },
+          ],
+        });
+      },
+    });
+
+    const result = await runIngest({
+      cwd: dir,
+      path: storyPath,
+      work: 'Second Work',
+      review: true,
+      llm,
+      reviewPrompt: async () => {
+        promptCalls += 1;
+        return 'y';
+      },
+      maxSpendUsd: 1,
+    });
+
+    // Only this run's one low-confidence claim should have been reviewed —
+    // the stale "Old Ghost" proposed claim from the earlier ingest must be
+    // left untouched.
+    expect(promptCalls).toBe(1);
+    expect(result.claimsCanon).toBe(1);
+
+    const db = openDb(join(dir, '.canonlint', 'canon.db'), { mustExist: true });
+    try {
+      const oldGhost = findClaims(db, { status: 'proposed' }).filter(
+        (c) => c.attribute === 'nature',
+      );
+      expect(oldGhost).toHaveLength(1);
+    } finally {
+      db.close();
+    }
   });
 
   it('still wraps adversarial corpus text as untrusted data', async () => {
