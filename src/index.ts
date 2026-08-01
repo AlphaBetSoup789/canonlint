@@ -36,4 +36,17 @@ export {
   type EntityOptions,
   type EntityResult,
 } from './commands/entity.js';
+export {
+  runCheck,
+  printCheck,
+  type CheckOptions,
+  type CheckResult,
+} from './commands/check.js';
+export {
+  runMerge,
+  printMerge,
+  type MergeOptions,
+  type MergeResult,
+} from './commands/merge.js';
 export * from './ingest/index.js';
+export * from './check/index.js';

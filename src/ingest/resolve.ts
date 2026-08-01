@@ -55,10 +55,16 @@ export interface ResolveInput {
   name: string;
   kind: EntityKind;
   aliases?: string[];
+  /**
+   * When false (check pipeline), never insert a new entity — return
+   * `entity: undefined` if nothing in the DB matches.
+   * Default true for ingest.
+   */
+  createIfMissing?: boolean;
 }
 
 export interface ResolveResult {
-  entity: Entity;
+  entity: Entity | undefined;
   usage: TokenUsage;
   /** True when the LLM was asked to adjudicate. */
   llmUsed: boolean;
@@ -215,6 +221,8 @@ export async function resolveEntity(
     }
   }
 
+  const createIfMissing = input.createIfMissing !== false;
+
   const sameKind = listEntities(db, input.kind);
   const candidates =
     sameKind.length > 0
@@ -223,49 +231,56 @@ export async function resolveEntity(
         ? listEntities(db)
         : [];
 
-  let llmUsed = false;
-  let entity: Entity;
-
   if (candidates.length === 0) {
-    entity = insertEntity(db, {
+    if (!createIfMissing) {
+      return { entity: undefined, usage, llmUsed: false };
+    }
+    const entity = insertEntity(db, {
       name: input.name,
       kind: input.kind,
       aliases: surfaceAliases.filter(
         (a) => a.toLowerCase() !== input.name.toLowerCase(),
       ),
     });
-  } else {
-    llmUsed = true;
-    const { decision, usage: resolveUsage } = await llmResolve(
-      provider,
-      input,
-      candidates,
-    );
-    usage = addUsage(usage, resolveUsage);
-
-    if (decision.match === 'existing' && decision.entity_id !== undefined) {
-      const existing = candidates.find((c) => c.id === decision.entity_id)!;
-      addEntityAliases(
-        db,
-        existing.id,
-        uniqueAliases(
-          decision.aliases,
-          surfaceAliases.filter((a) => a.toLowerCase() !== existing.name.toLowerCase()),
-        ),
-      );
-      entity = findEntityByNameOrAlias(db, existing.name, existing.kind) ?? existing;
-    } else {
-      const canonical = (decision.canonical_name ?? input.name).trim() || input.name;
-      entity = insertEntity(db, {
-        name: canonical,
-        kind: input.kind,
-        aliases: uniqueAliases(
-          decision.aliases,
-          surfaceAliases.filter((a) => a.toLowerCase() !== canonical.toLowerCase()),
-        ),
-      });
-    }
+    return { entity, usage, llmUsed: false };
   }
 
-  return { entity, usage, llmUsed };
+  const { decision, usage: resolveUsage } = await llmResolve(
+    provider,
+    input,
+    candidates,
+  );
+  usage = addUsage(usage, resolveUsage);
+
+  if (decision.match === 'existing' && decision.entity_id !== undefined) {
+    const existing = candidates.find((c) => c.id === decision.entity_id)!;
+    addEntityAliases(
+      db,
+      existing.id,
+      uniqueAliases(
+        decision.aliases,
+        surfaceAliases.filter((a) => a.toLowerCase() !== existing.name.toLowerCase()),
+      ),
+    );
+    return {
+      entity: findEntityByNameOrAlias(db, existing.name, existing.kind) ?? existing,
+      usage,
+      llmUsed: true,
+    };
+  }
+
+  if (!createIfMissing) {
+    return { entity: undefined, usage, llmUsed: true };
+  }
+
+  const canonical = (decision.canonical_name ?? input.name).trim() || input.name;
+  const entity = insertEntity(db, {
+    name: canonical,
+    kind: input.kind,
+    aliases: uniqueAliases(
+      decision.aliases,
+      surfaceAliases.filter((a) => a.toLowerCase() !== canonical.toLowerCase()),
+    ),
+  });
+  return { entity, usage, llmUsed: true };
 }

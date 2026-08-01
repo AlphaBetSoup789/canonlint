@@ -65,6 +65,10 @@ src/
     chunk.ts        word-budget + chapter-aware splits
     extract.ts      LLM claim extraction (untrusted envelope)
     resolve.ts      alias-aware entity resolution
+  check/
+    retrieve.ts     candidate canon claims for a draft claim
+    adjudicate.ts   pairwise LLM verdict + precision gate
+    report.ts       continuity report print/JSON
   commands/         one file per CLI verb
 ```
 
@@ -93,7 +97,7 @@ All four checks must pass before a commit. CI runs them on Linux/macOS/Windows.
 
 ## Milestones
 
-M0 ✅ scaffold · M1 ✅ ingest · M2 check · M3 Holmes demo · M4 launch.
+M0 ✅ scaffold · M1 ✅ ingest · M2 ✅ check · M3 Holmes demo · M4 launch.
 Don't start M(n+1) until M(n)'s acceptance test passes. Don't build from the
 deferred list (web UI, branches, vector retrieval, multi-user, hosted).
 

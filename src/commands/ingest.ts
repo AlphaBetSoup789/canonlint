@@ -173,6 +173,12 @@ export async function runIngest(options: IngestOptions): Promise<IngestResult> {
         aliases: claim.entity_aliases,
       });
       usage = addUsage(usage, resolved.usage);
+      if (!resolved.entity) {
+        // Ingest always creates entities; this is defensive.
+        throw new CanonlintError(
+          `Failed to resolve entity "${claim.entity_name}" during ingest.`,
+        );
+      }
       entityIds.add(resolved.entity.id);
 
       const source = insertSource(db, {

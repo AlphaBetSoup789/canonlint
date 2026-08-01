@@ -20,8 +20,9 @@ Contradictions (2)
   ...
 ```
 
-> **Status: early.** M1 is complete — `init`, `stats`, `ingest`, and `entity`
-> work. `check` / `merge` land in M2. See the [roadmap](#roadmap).
+> **Status: early.** M2 is complete — `init`, `stats`, `ingest`, `entity`,
+> `check`, and `merge` work. The Holmes continuity demo is M3. See the
+> [roadmap](#roadmap).
 
 ---
 
@@ -63,11 +64,13 @@ canonlint stats
 exceeds `CANONLINT_MAX_SPEND_USD` (override with `--max-spend`). Pass `--review`
 to approve low-confidence claims interactively instead of auto-promoting them.
 
-`check` lands in M2:
-
 ```sh
 canonlint check drafts/book-two-ch3.md
+canonlint merge drafts/book-two-ch3.md   # promote New facts into canon
 ```
+
+`check` routes uncertain calls to **Uncertain**, never to **Contradictions**.
+Every contradiction includes the canon excerpt it cites.
 
 ### Running with zero cloud spend
 
@@ -171,8 +174,8 @@ turned off within a week, and then it may as well not exist.
 | `canonlint stats`         | ✅     | summarise the database (`--json` for machine output)            |
 | `canonlint ingest <path>` | ✅     | extract claims (`--work`, `--order`, `--review`, `--max-spend`) |
 | `canonlint entity <name>` | ✅     | everything canon knows, with citations (`--json`)               |
-| `canonlint check <draft>` | M2     | lint a draft, write a continuity report                         |
-| `canonlint merge <draft>` | M2     | approve a draft's new facts into canon                          |
+| `canonlint check <draft>` | ✅     | lint a draft (`--json`, `--out`, `--max-spend`)                 |
+| `canonlint merge <draft>` | ✅     | approve a draft's new facts into canon (`--run`)                |
 
 ## How it works
 
@@ -193,7 +196,7 @@ point it at its replacement. The history of your canon stays readable.
 
 - **M0 — Scaffold** ✅ schema, migrations, provider adapters, `init`, `stats`
 - **M1 — Ingest** ✅ extraction, entity resolution, provenance, `entity`
-- **M2 — Check** — pairwise adjudication and the continuity report
+- **M2 — Check** ✅ pairwise adjudication, continuity report, `merge`
 - **M3 — The Holmes demo** — all 60 stories in publication order, and a report
   of every continuity error Doyle made
 - **M4 — Launch surface**
