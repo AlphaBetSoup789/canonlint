@@ -51,6 +51,7 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "test:watch": "vitest",
+    "demo:holmes": "tsx scripts/holmes-demo.ts",
     "prepublishOnly": "npm run build"
   },
   "dependencies": {

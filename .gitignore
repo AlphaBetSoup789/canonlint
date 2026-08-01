@@ -23,3 +23,6 @@ Thumbs.db
 
 .idea/
 .vscode/
+
+# Local Holmes corpus mirror (story text + extracted claims stay outside the repo)
+holmes-corpus/
