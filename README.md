@@ -20,9 +20,8 @@ Contradictions (2)
   ...
 ```
 
-> **Status: early.** M0 is complete — schema, provider adapters, `init`, and
-> `stats` work. `ingest` and `check` are the next two milestones. See the
-> [roadmap](#roadmap).
+> **Status: early.** M1 is complete — `init`, `stats`, `ingest`, and `entity`
+> work. `check` / `merge` land in M2. See the [roadmap](#roadmap).
 
 ---
 
@@ -55,13 +54,18 @@ npx canonlint init
 ```sh
 mkdir my-series && cd my-series
 npx canonlint init            # creates .canonlint/ with a local SQLite database
-canonlint stats               # empty, but confirms everything works
+canonlint ingest book-one/ --work "The First Book" --order 1
+canonlint entity "Protagonist"
+canonlint stats
 ```
 
-Then, once `ingest` lands (M1):
+`ingest` prints a cost estimate before it starts and refuses if the estimate
+exceeds `CANONLINT_MAX_SPEND_USD` (override with `--max-spend`). Pass `--review`
+to approve low-confidence claims interactively instead of auto-promoting them.
+
+`check` lands in M2:
 
 ```sh
-canonlint ingest book-one/ --work "The First Book" --order 1
 canonlint check drafts/book-two-ch3.md
 ```
 
@@ -161,14 +165,14 @@ turned off within a week, and then it may as well not exist.
 
 ## Commands
 
-| Command                   | Status |                                                      |
-| ------------------------- | ------ | ---------------------------------------------------- |
-| `canonlint init`          | ✅     | create `.canonlint/` and an empty canon database     |
-| `canonlint stats`         | ✅     | summarise the database (`--json` for machine output) |
-| `canonlint ingest <path>` | M1     | extract claims from a corpus                         |
-| `canonlint entity <name>` | M1     | everything canon knows, with citations               |
-| `canonlint check <draft>` | M2     | lint a draft, write a continuity report              |
-| `canonlint merge <draft>` | M2     | approve a draft's new facts into canon               |
+| Command                   | Status |                                                                 |
+| ------------------------- | ------ | --------------------------------------------------------------- |
+| `canonlint init`          | ✅     | create `.canonlint/` and an empty canon database                |
+| `canonlint stats`         | ✅     | summarise the database (`--json` for machine output)            |
+| `canonlint ingest <path>` | ✅     | extract claims (`--work`, `--order`, `--review`, `--max-spend`) |
+| `canonlint entity <name>` | ✅     | everything canon knows, with citations (`--json`)               |
+| `canonlint check <draft>` | M2     | lint a draft, write a continuity report                         |
+| `canonlint merge <draft>` | M2     | approve a draft's new facts into canon                          |
 
 ## How it works
 
@@ -188,7 +192,7 @@ point it at its replacement. The history of your canon stays readable.
 ## Roadmap
 
 - **M0 — Scaffold** ✅ schema, migrations, provider adapters, `init`, `stats`
-- **M1 — Ingest** — extraction, entity resolution, provenance
+- **M1 — Ingest** ✅ extraction, entity resolution, provenance, `entity`
 - **M2 — Check** — pairwise adjudication and the continuity report
 - **M3 — The Holmes demo** — all 60 stories in publication order, and a report
   of every continuity error Doyle made

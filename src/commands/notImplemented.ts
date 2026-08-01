@@ -6,10 +6,8 @@ import { CanonlintError } from '../util/errors.js';
  * they just refuse cleanly instead of half-working.
  */
 const MILESTONES: Record<string, string> = {
-  ingest: 'M1',
   check: 'M2',
   merge: 'M2',
-  entity: 'M1',
 };
 
 export function notImplemented(command: string): never {

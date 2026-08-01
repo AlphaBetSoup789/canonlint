@@ -117,11 +117,21 @@ describe('cli surface', () => {
     expect(names).toEqual(['check', 'entity', 'ingest', 'init', 'merge', 'stats']);
   });
 
-  it('refuses unimplemented commands cleanly rather than half-working', async () => {
+  it('exposes --max-spend on ingest', () => {
+    const ingest = buildProgram().commands.find((c) => c.name() === 'ingest');
+    const flags = ingest?.options.map((o) => o.long) ?? [];
+    expect(flags).toContain('--max-spend');
+    expect(flags).toContain('--review');
+  });
+
+  it('refuses unimplemented M2 commands cleanly rather than half-working', async () => {
     const program = buildProgram();
     program.exitOverride();
     await expect(
       program.parseAsync(['node', 'canonlint', 'check', 'draft.md']),
+    ).rejects.toThrow(/not implemented yet/);
+    await expect(
+      program.parseAsync(['node', 'canonlint', 'merge', 'draft.md']),
     ).rejects.toThrow(/not implemented yet/);
   });
 });

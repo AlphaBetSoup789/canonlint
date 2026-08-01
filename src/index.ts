@@ -24,3 +24,16 @@ export { CanonlintError, SpendCapError, isCanonlintError } from './util/errors.j
 
 export { runInit, type InitOptions, type InitResult } from './commands/init.js';
 export { runStats, type StatsOptions, type StatsResult } from './commands/stats.js';
+export {
+  runIngest,
+  printIngest,
+  type IngestOptions,
+  type IngestResult,
+} from './commands/ingest.js';
+export {
+  runEntity,
+  printEntity,
+  type EntityOptions,
+  type EntityResult,
+} from './commands/entity.js';
+export * from './ingest/index.js';

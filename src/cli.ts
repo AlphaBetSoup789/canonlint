@@ -2,7 +2,9 @@
 import { realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { Command, CommanderError } from 'commander';
+import { printEntity, runEntity } from './commands/entity.js';
 import { printInit, runInit } from './commands/init.js';
+import { printIngest, runIngest } from './commands/ingest.js';
 import { printStats, runStats } from './commands/stats.js';
 import { notImplemented } from './commands/notImplemented.js';
 import { isCanonlintError } from './util/errors.js';
@@ -19,7 +21,7 @@ export function buildProgram(): Command {
         'Build a canon database from your stories, then lint new drafts against it.',
     )
     .version(VERSION, '-v, --version')
-    .option('--provider <name>', 'anthropic | ollama (overrides config and env)')
+    .option('--provider <name>', 'anthropic | ollama | mock (overrides config and env)')
     .option('--model <id>', 'model id (overrides config and env)');
 
   program
@@ -57,8 +59,38 @@ export function buildProgram(): Command {
     .option('--work <title>', 'title of the work being ingested')
     .option('--order <n>', 'publication order index', Number)
     .option('--review', 'review proposed claims interactively before promoting', false)
+    .option(
+      '--max-spend <usd>',
+      'abort if the pre-run estimate exceeds this USD amount',
+      Number,
+    )
     .description('extract claims from a corpus into the canon database')
-    .action(() => notImplemented('ingest'));
+    .action(
+      async (
+        path: string,
+        options: {
+          work?: string;
+          order?: number;
+          review: boolean;
+          maxSpend?: number;
+        },
+      ) => {
+        const globals = program.opts<{ provider?: string; model?: string }>();
+        printIngest(
+          await runIngest({
+            path,
+            work: options.work,
+            order: options.order,
+            review: options.review,
+            ...(options.maxSpend !== undefined
+              ? { maxSpendUsd: options.maxSpend }
+              : {}),
+            ...(globals.provider ? { provider: globals.provider } : {}),
+            ...(globals.model ? { model: globals.model } : {}),
+          }),
+        );
+      },
+    );
 
   program
     .command('check')
@@ -69,14 +101,39 @@ export function buildProgram(): Command {
   program
     .command('merge')
     .argument('<draft>', 'draft whose new facts should become canon')
-    .description('approve a draft’s new facts into the canon database')
+    .description("approve a draft's new facts into the canon database")
     .action(() => notImplemented('merge'));
 
   program
     .command('entity')
     .argument('<name>', 'entity name')
+    .option('--json', 'emit machine-readable JSON', false)
     .description('show everything canon knows about an entity, with citations')
-    .action(() => notImplemented('entity'));
+    .action((name: string, options: { json: boolean }) => {
+      const globals = program.opts<{ provider?: string; model?: string }>();
+      const result = runEntity({
+        name,
+        ...(globals.provider ? { provider: globals.provider } : {}),
+        ...(globals.model ? { model: globals.model } : {}),
+      });
+      if (options.json) {
+        log.info(
+          JSON.stringify(
+            {
+              id: result.entity.id,
+              name: result.entity.name,
+              kind: result.entity.kind,
+              aliases: result.aliases,
+              claims: result.claims,
+            },
+            null,
+            2,
+          ),
+        );
+      } else {
+        printEntity(result);
+      }
+    });
 
   return program;
 }
