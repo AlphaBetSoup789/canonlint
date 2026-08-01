@@ -66,18 +66,43 @@ jobs:
       - name: Build
         run: npm run build
 
+      # This is the M0 acceptance test, run on every supported platform.
+      # It asserts the commands *produce output*, not merely that they exit 0 —
+      # a Windows-only entry-point bug once made the CLI a silent no-op that
+      # still exited cleanly.
       - name: Smoke-test the built CLI
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/smoke"
           cd "$RUNNER_TEMP/smoke"
-          node "$GITHUB_WORKSPACE/dist/cli.js" init
-          node "$GITHUB_WORKSPACE/dist/cli.js" stats
-          node "$GITHUB_WORKSPACE/dist/cli.js" stats --json | node -e '
+          CLI="$GITHUB_WORKSPACE/dist/cli.js"
+
+          test -n "$(node "$CLI" --version)" || {
+            echo "::error::\`canonlint --version\` printed nothing"; exit 1; }
+
+          init_out=$(node "$CLI" init)
+          echo "$init_out"
+          case "$init_out" in
+            *"canon database"*) ;;
+            *) echo "::error::\`canonlint init\` printed nothing useful"; exit 1 ;;
+          esac
+
+          test -f .canonlint/canon.db || {
+            echo "::error::init did not create .canonlint/canon.db"; exit 1; }
+
+          stats_out=$(node "$CLI" stats)
+          echo "$stats_out"
+          test -n "$stats_out" || {
+            echo "::error::\`canonlint stats\` printed nothing"; exit 1; }
+
+          node "$CLI" stats --json | node -e '
             let raw = "";
             process.stdin.on("data", (c) => (raw += c));
             process.stdin.on("end", () => {
+              if (raw.trim() === "") {
+                throw new Error("`canonlint stats --json` produced no output");
+              }
               const stats = JSON.parse(raw);
               if (stats.schemaVersion !== stats.latestSchemaVersion) {
                 throw new Error("schema version mismatch after init");

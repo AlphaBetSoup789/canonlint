@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import { realpathSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { Command, CommanderError } from 'commander';
 import { printInit, runInit } from './commands/init.js';
 import { printStats, runStats } from './commands/stats.js';
@@ -105,8 +107,28 @@ export async function main(argv: string[] = process.argv): Promise<number> {
   }
 }
 
-// Only run when invoked as a binary, so tests can import `main` freely.
-if (process.argv[1] && import.meta.url === `file://${process.argv[1]}`) {
+/**
+ * True when this module is the process entry point, rather than an import.
+ *
+ * Comparing `import.meta.url` against a hand-built `file://${argv[1]}` string
+ * looks equivalent and is not: on Windows the real URL is `file:///C:/...`
+ * while the concatenation yields `file://C:\...`, so the guard never matched
+ * and the CLI exited 0 having done nothing at all.
+ *
+ * `realpathSync` additionally resolves the symlink npm creates for a global
+ * `bin` install, which would otherwise make the two paths differ.
+ */
+function isEntryPoint(): boolean {
+  const entry = process.argv[1];
+  if (!entry) return false;
+  try {
+    return realpathSync(fileURLToPath(import.meta.url)) === realpathSync(entry);
+  } catch {
+    return false;
+  }
+}
+
+if (isEntryPoint()) {
   main().then((code) => {
     process.exitCode = code;
   });
