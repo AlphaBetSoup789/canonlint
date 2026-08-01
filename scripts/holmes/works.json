@@ -1,0 +1,422 @@
+[
+  {
+    "id": "study-in-scarlet",
+    "title": "A Study in Scarlet",
+    "order": 1,
+    "published": "1887",
+    "collection": "novel"
+  },
+  {
+    "id": "sign-of-the-four",
+    "title": "The Sign of the Four",
+    "order": 2,
+    "published": "1890",
+    "collection": "novel"
+  },
+  {
+    "id": "scandal-in-bohemia",
+    "title": "A Scandal in Bohemia",
+    "order": 3,
+    "published": "1891",
+    "collection": "adventures"
+  },
+  {
+    "id": "red-headed-league",
+    "title": "The Red-Headed League",
+    "order": 4,
+    "published": "1891",
+    "collection": "adventures"
+  },
+  {
+    "id": "case-of-identity",
+    "title": "A Case of Identity",
+    "order": 5,
+    "published": "1891",
+    "collection": "adventures"
+  },
+  {
+    "id": "boscombe-valley-mystery",
+    "title": "The Boscombe Valley Mystery",
+    "order": 6,
+    "published": "1891",
+    "collection": "adventures"
+  },
+  {
+    "id": "five-orange-pips",
+    "title": "The Five Orange Pips",
+    "order": 7,
+    "published": "1891",
+    "collection": "adventures"
+  },
+  {
+    "id": "man-with-the-twisted-lip",
+    "title": "The Man with the Twisted Lip",
+    "order": 8,
+    "published": "1891",
+    "collection": "adventures"
+  },
+  {
+    "id": "blue-carbuncle",
+    "title": "The Adventure of the Blue Carbuncle",
+    "order": 9,
+    "published": "1892",
+    "collection": "adventures"
+  },
+  {
+    "id": "speckled-band",
+    "title": "The Adventure of the Speckled Band",
+    "order": 10,
+    "published": "1892",
+    "collection": "adventures"
+  },
+  {
+    "id": "engineers-thumb",
+    "title": "The Adventure of the Engineer's Thumb",
+    "order": 11,
+    "published": "1892",
+    "collection": "adventures"
+  },
+  {
+    "id": "noble-bachelor",
+    "title": "The Adventure of the Noble Bachelor",
+    "order": 12,
+    "published": "1892",
+    "collection": "adventures"
+  },
+  {
+    "id": "beryl-coronet",
+    "title": "The Adventure of the Beryl Coronet",
+    "order": 13,
+    "published": "1892",
+    "collection": "adventures"
+  },
+  {
+    "id": "copper-beeches",
+    "title": "The Adventure of the Copper Beeches",
+    "order": 14,
+    "published": "1892",
+    "collection": "adventures"
+  },
+  {
+    "id": "silver-blaze",
+    "title": "The Adventure of Silver Blaze",
+    "order": 15,
+    "published": "1892",
+    "collection": "memoirs"
+  },
+  {
+    "id": "cardboard-box",
+    "title": "The Adventure of the Cardboard Box",
+    "order": 16,
+    "published": "1893",
+    "collection": "memoirs"
+  },
+  {
+    "id": "yellow-face",
+    "title": "The Adventure of the Yellow Face",
+    "order": 17,
+    "published": "1893",
+    "collection": "memoirs"
+  },
+  {
+    "id": "stockbrokers-clerk",
+    "title": "The Adventure of the Stockbroker's Clerk",
+    "order": 18,
+    "published": "1893",
+    "collection": "memoirs"
+  },
+  {
+    "id": "gloria-scott",
+    "title": "The Adventure of the Gloria Scott",
+    "order": 19,
+    "published": "1893",
+    "collection": "memoirs"
+  },
+  {
+    "id": "musgrave-ritual",
+    "title": "The Adventure of the Musgrave Ritual",
+    "order": 20,
+    "published": "1893",
+    "collection": "memoirs"
+  },
+  {
+    "id": "reigate-squire",
+    "title": "The Adventure of the Reigate Squire",
+    "order": 21,
+    "published": "1893",
+    "collection": "memoirs"
+  },
+  {
+    "id": "crooked-man",
+    "title": "The Adventure of the Crooked Man",
+    "order": 22,
+    "published": "1893",
+    "collection": "memoirs"
+  },
+  {
+    "id": "resident-patient",
+    "title": "The Adventure of the Resident Patient",
+    "order": 23,
+    "published": "1893",
+    "collection": "memoirs"
+  },
+  {
+    "id": "greek-interpreter",
+    "title": "The Adventure of the Greek Interpreter",
+    "order": 24,
+    "published": "1893",
+    "collection": "memoirs"
+  },
+  {
+    "id": "naval-treaty",
+    "title": "The Adventure of the Naval Treaty",
+    "order": 25,
+    "published": "1893",
+    "collection": "memoirs"
+  },
+  {
+    "id": "final-problem",
+    "title": "The Adventure of the Final Problem",
+    "order": 26,
+    "published": "1893",
+    "collection": "memoirs"
+  },
+  {
+    "id": "hound-of-the-baskervilles",
+    "title": "The Hound of the Baskervilles",
+    "order": 27,
+    "published": "1901",
+    "collection": "novel"
+  },
+  {
+    "id": "empty-house",
+    "title": "The Adventure of the Empty House",
+    "order": 28,
+    "published": "1903",
+    "collection": "return"
+  },
+  {
+    "id": "norwood-builder",
+    "title": "The Adventure of the Norwood Builder",
+    "order": 29,
+    "published": "1903",
+    "collection": "return"
+  },
+  {
+    "id": "dancing-men",
+    "title": "The Adventure of the Dancing Men",
+    "order": 30,
+    "published": "1903",
+    "collection": "return"
+  },
+  {
+    "id": "solitary-cyclist",
+    "title": "The Adventure of the Solitary Cyclist",
+    "order": 31,
+    "published": "1904",
+    "collection": "return"
+  },
+  {
+    "id": "priory-school",
+    "title": "The Adventure of the Priory School",
+    "order": 32,
+    "published": "1904",
+    "collection": "return"
+  },
+  {
+    "id": "black-peter",
+    "title": "The Adventure of Black Peter",
+    "order": 33,
+    "published": "1904",
+    "collection": "return"
+  },
+  {
+    "id": "charles-augustus-milverton",
+    "title": "The Adventure of Charles Augustus Milverton",
+    "order": 34,
+    "published": "1904",
+    "collection": "return"
+  },
+  {
+    "id": "six-napoleons",
+    "title": "The Adventure of the Six Napoleons",
+    "order": 35,
+    "published": "1904",
+    "collection": "return"
+  },
+  {
+    "id": "three-students",
+    "title": "The Adventure of the Three Students",
+    "order": 36,
+    "published": "1904",
+    "collection": "return"
+  },
+  {
+    "id": "golden-pince-nez",
+    "title": "The Adventure of the Golden Pince-Nez",
+    "order": 37,
+    "published": "1904",
+    "collection": "return"
+  },
+  {
+    "id": "missing-three-quarter",
+    "title": "The Adventure of the Missing Three-Quarter",
+    "order": 38,
+    "published": "1904",
+    "collection": "return"
+  },
+  {
+    "id": "abbey-grange",
+    "title": "The Adventure of the Abbey Grange",
+    "order": 39,
+    "published": "1904",
+    "collection": "return"
+  },
+  {
+    "id": "second-stain",
+    "title": "The Adventure of the Second Stain",
+    "order": 40,
+    "published": "1904",
+    "collection": "return"
+  },
+  {
+    "id": "wisteria-lodge",
+    "title": "The Adventure of Wisteria Lodge",
+    "order": 41,
+    "published": "1908",
+    "collection": "last-bow"
+  },
+  {
+    "id": "bruce-partington-plans",
+    "title": "The Adventure of the Bruce-Partington Plans",
+    "order": 42,
+    "published": "1908",
+    "collection": "last-bow"
+  },
+  {
+    "id": "devils-foot",
+    "title": "The Adventure of the Devil's Foot",
+    "order": 43,
+    "published": "1910",
+    "collection": "last-bow"
+  },
+  {
+    "id": "red-circle",
+    "title": "The Adventure of the Red Circle",
+    "order": 44,
+    "published": "1911",
+    "collection": "last-bow"
+  },
+  {
+    "id": "disappearance-of-lady-frances-carfax",
+    "title": "The Disappearance of Lady Frances Carfax",
+    "order": 45,
+    "published": "1911",
+    "collection": "last-bow"
+  },
+  {
+    "id": "dying-detective",
+    "title": "The Adventure of the Dying Detective",
+    "order": 46,
+    "published": "1913",
+    "collection": "last-bow"
+  },
+  {
+    "id": "valley-of-fear",
+    "title": "The Valley of Fear",
+    "order": 47,
+    "published": "1914",
+    "collection": "novel"
+  },
+  {
+    "id": "his-last-bow",
+    "title": "His Last Bow",
+    "order": 48,
+    "published": "1917",
+    "collection": "last-bow"
+  },
+  {
+    "id": "mazarin-stone",
+    "title": "The Adventure of the Mazarin Stone",
+    "order": 49,
+    "published": "1921",
+    "collection": "case-book"
+  },
+  {
+    "id": "thor-bridge",
+    "title": "The Problem of Thor Bridge",
+    "order": 50,
+    "published": "1922",
+    "collection": "case-book"
+  },
+  {
+    "id": "creeping-man",
+    "title": "The Adventure of the Creeping Man",
+    "order": 51,
+    "published": "1923",
+    "collection": "case-book"
+  },
+  {
+    "id": "sussex-vampire",
+    "title": "The Adventure of the Sussex Vampire",
+    "order": 52,
+    "published": "1924",
+    "collection": "case-book"
+  },
+  {
+    "id": "three-garridebs",
+    "title": "The Adventure of the Three Garridebs",
+    "order": 53,
+    "published": "1925",
+    "collection": "case-book"
+  },
+  {
+    "id": "illustrious-client",
+    "title": "The Adventure of the Illustrious Client",
+    "order": 54,
+    "published": "1925",
+    "collection": "case-book"
+  },
+  {
+    "id": "three-gables",
+    "title": "The Adventure of the Three Gables",
+    "order": 55,
+    "published": "1926",
+    "collection": "case-book"
+  },
+  {
+    "id": "blanched-soldier",
+    "title": "The Adventure of the Blanched Soldier",
+    "order": 56,
+    "published": "1926",
+    "collection": "case-book"
+  },
+  {
+    "id": "lions-mane",
+    "title": "The Adventure of the Lion's Mane",
+    "order": 57,
+    "published": "1926",
+    "collection": "case-book"
+  },
+  {
+    "id": "retired-colourman",
+    "title": "The Adventure of the Retired Colourman",
+    "order": 58,
+    "published": "1927",
+    "collection": "case-book"
+  },
+  {
+    "id": "veiled-lodger",
+    "title": "The Adventure of the Veiled Lodger",
+    "order": 59,
+    "published": "1927",
+    "collection": "case-book"
+  },
+  {
+    "id": "shoscombe-old-place",
+    "title": "The Adventure of Shoscombe Old Place",
+    "order": 60,
+    "published": "1927",
+    "collection": "case-book"
+  }
+]
