@@ -19,7 +19,6 @@ describe('resolveEntity', () => {
   it('merges Holmes / Sherlock Holmes / my friend Holmes onto one entity', async () => {
     const provider = new MockProvider({
       responder: (req) => {
-        // First LLM call should match the existing Sherlock Holmes candidate.
         if (req.user.includes('entity resolution')) {
           const idMatch = /id=(\d+)/.exec(req.user);
           return JSON.stringify({
@@ -37,24 +36,22 @@ describe('resolveEntity', () => {
       kind: 'character',
       aliases: ['Holmes'],
     });
+    expect(first.entity).toBeDefined();
     expect(first.llmUsed).toBe(false);
 
     const second = await resolveEntity(db, provider, {
       name: 'Holmes',
       kind: 'character',
     });
-    expect(second.entity.id).toBe(first.entity.id);
+    expect(second.entity?.id).toBe(first.entity!.id);
     expect(second.llmUsed).toBe(false);
 
-    // Force the alias-only path via LLM by using a novel surface form with
-    // candidates present but no name/alias hit — "my friend Holmes" after we
-    // clear aliases would need LLM; instead add a third resolve that hits alias.
-    addEntityAliases(db, first.entity.id, ['my friend Holmes']);
+    addEntityAliases(db, first.entity!.id, ['my friend Holmes']);
     const third = await resolveEntity(db, provider, {
       name: 'my friend Holmes',
       kind: 'character',
     });
-    expect(third.entity.id).toBe(first.entity.id);
+    expect(third.entity?.id).toBe(first.entity!.id);
 
     const aliases = getEntityAliases(
       findEntityByNameOrAlias(db, 'Sherlock Holmes', 'character')!,
@@ -63,7 +60,9 @@ describe('resolveEntity', () => {
       expect.arrayContaining(['holmes', 'my friend holmes']),
     );
 
-    const all = db.prepare('SELECT COUNT(*) AS n FROM entities').get() as { n: number };
+    const all = db.prepare('SELECT COUNT(*) AS n FROM entities').get() as {
+      n: number;
+    };
     expect(all.n).toBe(1);
   });
 
@@ -87,8 +86,8 @@ describe('resolveEntity', () => {
       kind: 'character',
     });
     expect(result.llmUsed).toBe(true);
-    expect(result.entity.name).toBe('Sherlock Holmes');
-    expect(getEntityAliases(result.entity)).toContain('the detective');
+    expect(result.entity?.name).toBe('Sherlock Holmes');
+    expect(getEntityAliases(result.entity!)).toContain('the detective');
   });
 
   it('creates a new entity when the LLM says new', async () => {
@@ -106,7 +105,21 @@ describe('resolveEntity', () => {
       name: 'Mycroft',
       kind: 'character',
     });
-    expect(result.entity.name).toBe('Mycroft Holmes');
-    expect(result.entity.id).not.toBe(1);
+    expect(result.entity?.name).toBe('Mycroft Holmes');
+    expect(result.entity?.id).not.toBe(1);
+  });
+
+  it('does not create entities when createIfMissing is false', async () => {
+    const provider = new MockProvider();
+    const result = await resolveEntity(db, provider, {
+      name: 'Nobody',
+      kind: 'character',
+      createIfMissing: false,
+    });
+    expect(result.entity).toBeUndefined();
+    const all = db.prepare('SELECT COUNT(*) AS n FROM entities').get() as {
+      n: number;
+    };
+    expect(all.n).toBe(0);
   });
 });

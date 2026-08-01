@@ -124,14 +124,14 @@ describe('cli surface', () => {
     expect(flags).toContain('--review');
   });
 
-  it('refuses unimplemented M2 commands cleanly rather than half-working', async () => {
-    const program = buildProgram();
-    program.exitOverride();
-    await expect(
-      program.parseAsync(['node', 'canonlint', 'check', 'draft.md']),
-    ).rejects.toThrow(/not implemented yet/);
-    await expect(
-      program.parseAsync(['node', 'canonlint', 'merge', 'draft.md']),
-    ).rejects.toThrow(/not implemented yet/);
+  it('exposes check and merge options', () => {
+    const check = buildProgram().commands.find((c) => c.name() === 'check');
+    const merge = buildProgram().commands.find((c) => c.name() === 'merge');
+    expect(check?.options.map((o) => o.long)).toEqual(
+      expect.arrayContaining(['--json', '--out', '--max-spend']),
+    );
+    expect(merge?.options.map((o) => o.long)).toEqual(
+      expect.arrayContaining(['--run', '--proposed']),
+    );
   });
 });

@@ -4,6 +4,7 @@ import { CanonlintError } from '../util/errors.js';
 import {
   DEFAULT_BRANCH,
   type Claim,
+  type Conflict,
   type DbStats,
   type Entity,
   type NewClaim,
@@ -312,6 +313,65 @@ export function findCitedClaims(db: Db, query: ClaimQuery = {}): CitedClaim[] {
   return db.prepare(sql).all(params) as CitedClaim[];
 }
 
+export function getCitedClaimById(db: Db, id: number): CitedClaim | undefined {
+  return db
+    .prepare(
+      `SELECT c.*, e.name AS entity_name, e.kind AS entity_kind,
+              w.title AS work_title, s.locator, s.text_excerpt
+       FROM claims c
+       JOIN entities e ON e.id = c.entity_id
+       JOIN sources  s ON s.id = c.source_id
+       JOIN works    w ON w.id = s.work_id
+       WHERE c.id = ?`,
+    )
+    .get(id) as CitedClaim | undefined;
+}
+
+/**
+ * Candidate canon claims for adjudication. Prefers exact attribute matches,
+ * then other canon claims on the same entity (related-attribute fallback
+ * without vector retrieval).
+ */
+export function findCandidateClaims(
+  db: Db,
+  options: {
+    entityId: number;
+    attribute?: string;
+    branch?: string;
+    status?: Claim['status'];
+    /** Cap on non-exact related claims appended after exact matches. */
+    relatedLimit?: number;
+  },
+): CitedClaim[] {
+  const branch = options.branch ?? DEFAULT_BRANCH;
+  const status = options.status ?? 'canon';
+  const exact = options.attribute
+    ? findCitedClaims(db, {
+        entityId: options.entityId,
+        attribute: options.attribute,
+        branch,
+        status,
+      })
+    : [];
+
+  const allForEntity = findCitedClaims(db, {
+    entityId: options.entityId,
+    branch,
+    status,
+  });
+
+  if (!options.attribute) {
+    return allForEntity;
+  }
+
+  const exactIds = new Set(exact.map((c) => c.id));
+  const relatedLimit = options.relatedLimit ?? 12;
+  const related = allForEntity
+    .filter((c) => !exactIds.has(c.id))
+    .slice(0, relatedLimit);
+  return [...exact, ...related];
+}
+
 // --- runs & conflicts ------------------------------------------------------
 
 export function insertRun(db: Db, run: NewRun): Run {
@@ -342,21 +402,98 @@ export function updateRunStats(
   );
 }
 
-export function insertConflict(db: Db, conflict: NewConflict): void {
-  db.prepare(
-    `INSERT INTO conflicts
-       (run_id, draft_claim_json, canon_claim_id, kind, severity, explanation, verdict)
-     VALUES
-       (@run_id, @draft_claim_json, @canon_claim_id, @kind, @severity, @explanation, @verdict)`,
-  ).run({
-    run_id: conflict.run_id,
-    draft_claim_json: JSON.stringify(conflict.draft_claim),
-    canon_claim_id: conflict.canon_claim_id ?? null,
-    kind: conflict.kind,
-    severity: conflict.severity,
-    explanation: conflict.explanation,
-    verdict: conflict.verdict ?? 'open',
-  });
+export function insertConflict(db: Db, conflict: NewConflict): number {
+  const info = db
+    .prepare(
+      `INSERT INTO conflicts
+         (run_id, draft_claim_json, canon_claim_id, kind, severity, explanation, verdict)
+       VALUES
+         (@run_id, @draft_claim_json, @canon_claim_id, @kind, @severity, @explanation, @verdict)`,
+    )
+    .run({
+      run_id: conflict.run_id,
+      draft_claim_json: JSON.stringify(conflict.draft_claim),
+      canon_claim_id: conflict.canon_claim_id ?? null,
+      kind: conflict.kind,
+      severity: conflict.severity,
+      explanation: conflict.explanation,
+      verdict: conflict.verdict ?? 'open',
+    });
+  return Number(info.lastInsertRowid);
+}
+
+export function getRun(db: Db, id: number): Run {
+  const row = db.prepare('SELECT * FROM runs WHERE id = ?').get(id) as Run | undefined;
+  if (!row) throw new CanonlintError(`No run with id ${id}.`);
+  return row;
+}
+
+export function findLatestRun(db: Db, kind?: Run['kind']): Run | undefined {
+  if (kind) {
+    return db
+      .prepare('SELECT * FROM runs WHERE kind = ? ORDER BY id DESC LIMIT 1')
+      .get(kind) as Run | undefined;
+  }
+  return db.prepare('SELECT * FROM runs ORDER BY id DESC LIMIT 1').get() as
+    Run | undefined;
+}
+
+/**
+ * Latest run of a given kind against a specific target (e.g. the same
+ * resolved draft path). Prevents `merge` from picking up another draft's
+ * check run just because it happened to run more recently.
+ */
+export function findLatestRunByTarget(
+  db: Db,
+  kind: Run['kind'],
+  target: string,
+): Run | undefined {
+  return db
+    .prepare(
+      'SELECT * FROM runs WHERE kind = ? AND target = ? ORDER BY id DESC LIMIT 1',
+    )
+    .get(kind, target) as Run | undefined;
+}
+
+export interface ConflictQuery {
+  runId?: number;
+  kind?: Conflict['kind'];
+  verdict?: Conflict['verdict'];
+}
+
+export function listConflicts(db: Db, query: ConflictQuery = {}): Conflict[] {
+  const where: string[] = [];
+  const params: Record<string, unknown> = {};
+  if (query.runId !== undefined) {
+    where.push('run_id = @runId');
+    params.runId = query.runId;
+  }
+  if (query.kind !== undefined) {
+    where.push('kind = @kind');
+    params.kind = query.kind;
+  }
+  if (query.verdict !== undefined) {
+    where.push('verdict = @verdict');
+    params.verdict = query.verdict;
+  }
+  const sql =
+    'SELECT * FROM conflicts' +
+    (where.length ? ` WHERE ${where.join(' AND ')}` : '') +
+    ' ORDER BY id';
+  return db.prepare(sql).all(params) as Conflict[];
+}
+
+export function updateConflictVerdict(
+  db: Db,
+  id: number,
+  verdict: Conflict['verdict'],
+): void {
+  const result = db
+    .prepare('UPDATE conflicts SET verdict = ? WHERE id = ?')
+    .run(verdict, id);
+  if (result.changes === 0) {
+    throw new CanonlintError(`No conflict with id ${id}.`);
+  }
 }
 
 // --- stats -----------------------------------------------------------------

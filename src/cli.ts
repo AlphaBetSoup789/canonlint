@@ -2,11 +2,12 @@
 import { realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { Command, CommanderError } from 'commander';
+import { printCheck, runCheck } from './commands/check.js';
 import { printEntity, runEntity } from './commands/entity.js';
 import { printInit, runInit } from './commands/init.js';
 import { printIngest, runIngest } from './commands/ingest.js';
+import { printMerge, runMerge } from './commands/merge.js';
 import { printStats, runStats } from './commands/stats.js';
-import { notImplemented } from './commands/notImplemented.js';
 import { isCanonlintError } from './util/errors.js';
 import { log } from './util/logger.js';
 import { VERSION } from './version.js';
@@ -95,14 +96,49 @@ export function buildProgram(): Command {
   program
     .command('check')
     .argument('<draft>', 'draft file to lint')
+    .option('--json', 'emit machine-readable JSON', false)
+    .option('--out <file>', 'also write a markdown report to this path')
+    .option(
+      '--max-spend <usd>',
+      'abort if the pre-run estimate exceeds this USD amount',
+      Number,
+    )
     .description('lint a draft against canon and write a continuity report')
-    .action(() => notImplemented('check'));
+    .action(
+      async (
+        draft: string,
+        options: { json: boolean; out?: string; maxSpend?: number },
+      ) => {
+        const globals = program.opts<{ provider?: string; model?: string }>();
+        const result = await runCheck({
+          draft,
+          out: options.out,
+          ...(options.maxSpend !== undefined ? { maxSpendUsd: options.maxSpend } : {}),
+          ...(globals.provider ? { provider: globals.provider } : {}),
+          ...(globals.model ? { model: globals.model } : {}),
+        });
+        printCheck(result, options.json);
+      },
+    );
 
   program
     .command('merge')
     .argument('<draft>', 'draft whose new facts should become canon')
+    .option('--run <id>', 'check run id to merge from (default: latest)', Number)
+    .option('--proposed', 'store merged claims as proposed instead of canon', false)
     .description("approve a draft's new facts into the canon database")
-    .action(() => notImplemented('merge'));
+    .action((draft: string, options: { run?: number; proposed: boolean }) => {
+      const globals = program.opts<{ provider?: string; model?: string }>();
+      printMerge(
+        runMerge({
+          draft,
+          proposed: options.proposed,
+          ...(options.run !== undefined ? { runId: options.run } : {}),
+          ...(globals.provider ? { provider: globals.provider } : {}),
+          ...(globals.model ? { model: globals.model } : {}),
+        }),
+      );
+    });
 
   program
     .command('entity')
