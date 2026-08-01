@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import { openDb, type Db } from '../src/db/index.js';
 import {
+  addEntityAliases,
   findCitedClaims,
   findClaims,
+  findEntityByNameOrAlias,
   getStats,
   insertClaim,
   insertConflict,
@@ -10,6 +12,8 @@ import {
   insertRun,
   insertSource,
   insertWork,
+  listEntities,
+  setClaimStatus,
   supersedeClaim,
   upsertEntity,
   upsertWork,
@@ -201,6 +205,45 @@ describe('upserts', () => {
     const a = upsertEntity(db, { name: 'Sherlock Holmes', kind: 'character' });
     const b = upsertEntity(db, { name: 'sherlock holmes', kind: 'character' });
     expect(b.id).toBe(a.id);
+  });
+});
+
+describe('entity lookup by name or alias', () => {
+  it('finds an entity through a recorded alias', () => {
+    const holmes = insertEntity(db, {
+      name: 'Sherlock Holmes',
+      kind: 'character',
+      aliases: ['Holmes'],
+    });
+    addEntityAliases(db, holmes.id, ['my friend Holmes']);
+
+    expect(findEntityByNameOrAlias(db, 'Holmes', 'character')?.id).toBe(holmes.id);
+    expect(findEntityByNameOrAlias(db, 'my friend Holmes')?.id).toBe(holmes.id);
+    expect(findEntityByNameOrAlias(db, 'SHERLOCK HOLMES')?.id).toBe(holmes.id);
+    expect(findEntityByNameOrAlias(db, 'Mycroft')).toBeUndefined();
+  });
+
+  it('lists entities filtered by kind', () => {
+    insertEntity(db, { name: 'Baker Street', kind: 'place' });
+    insertEntity(db, { name: 'Sherlock Holmes', kind: 'character' });
+    expect(listEntities(db, 'character')).toHaveLength(1);
+    expect(listEntities(db)).toHaveLength(2);
+  });
+
+  it('promotes and rejects claims via setClaimStatus', () => {
+    const { entity, source } = seed(db);
+    const claim = insertClaim(db, {
+      entity_id: entity.id,
+      attribute: 'nationality',
+      value: 'English',
+      modality: 'asserted',
+      status: 'proposed',
+      source_id: source.id,
+    });
+    setClaimStatus(db, claim.id, 'canon');
+    expect(findClaims(db, { status: 'canon' })).toHaveLength(1);
+    setClaimStatus(db, claim.id, 'rejected');
+    expect(findClaims(db, { status: 'rejected' })).toHaveLength(1);
   });
 });
 

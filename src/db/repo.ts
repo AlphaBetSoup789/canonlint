@@ -138,6 +138,48 @@ export function addEntityAliases(db: Db, entityId: number, aliases: string[]): v
   );
 }
 
+export function getEntity(db: Db, id: number): Entity {
+  const row = db.prepare('SELECT * FROM entities WHERE id = ?').get(id) as
+    Entity | undefined;
+  if (!row) throw new CanonlintError(`No entity with id ${id}.`);
+  return row;
+}
+
+export function listEntities(db: Db, kind?: NewEntity['kind']): Entity[] {
+  if (kind) {
+    return db
+      .prepare('SELECT * FROM entities WHERE kind = ? ORDER BY name COLLATE NOCASE')
+      .all(kind) as Entity[];
+  }
+  return db
+    .prepare('SELECT * FROM entities ORDER BY name COLLATE NOCASE')
+    .all() as Entity[];
+}
+
+/**
+ * Resolve an entity by canonical name or any recorded alias (case-insensitive).
+ * App-side alias scan keeps the lookup portable and avoids JSON1 edge cases.
+ */
+export function findEntityByNameOrAlias(
+  db: Db,
+  name: string,
+  kind?: NewEntity['kind'],
+): Entity | undefined {
+  const byName = findEntity(db, name, kind);
+  if (byName) return byName;
+
+  const needle = name.trim().toLowerCase();
+  if (needle === '') return undefined;
+
+  for (const entity of listEntities(db, kind)) {
+    if (entity.name.toLowerCase() === needle) return entity;
+    for (const alias of getEntityAliases(entity)) {
+      if (alias.toLowerCase() === needle) return entity;
+    }
+  }
+  return undefined;
+}
+
 // --- claims ----------------------------------------------------------------
 
 /**
@@ -184,6 +226,15 @@ export function supersedeClaim(db: Db, oldId: number, newId: number): void {
     .run(newId, oldId);
   if (result.changes === 0) {
     throw new CanonlintError(`No claim with id ${oldId}.`);
+  }
+}
+
+export function setClaimStatus(db: Db, id: number, status: Claim['status']): void {
+  const result = db
+    .prepare('UPDATE claims SET status = ? WHERE id = ?')
+    .run(status, id);
+  if (result.changes === 0) {
+    throw new CanonlintError(`No claim with id ${id}.`);
   }
 }
 
