@@ -41,10 +41,7 @@ export function corpusWorksPath(corpusRoot: string): string {
  */
 export function loadHolmesManifest(corpusRoot?: string): HolmesWork[] {
   const root = corpusRoot?.trim();
-  const candidates = [
-    ...(root ? [corpusWorksPath(root)] : []),
-    defaultWorksPath(),
-  ];
+  const candidates = [...(root ? [corpusWorksPath(root)] : []), defaultWorksPath()];
 
   for (const path of candidates) {
     if (!existsSync(path)) continue;

@@ -80,12 +80,118 @@ function holmesResolveResponder(user: string): string | null {
   });
 }
 
+/**
+ * Famous Doyle continuity landmines.
+ * Each pair is (draftValueNeedle, canonValueNeedle) — directed, so life
+ * progression (married → widowed) is not treated as a contradiction.
+ */
+const HARD_INCOMPATIBLE: ReadonlyArray<{
+  attribute: string;
+  /** Directed: draft contains `draft`, canon contains `canon`. */
+  directed: ReadonlyArray<{ draft: string; canon: string }>;
+}> = [
+  {
+    attribute: 'wound_location',
+    directed: [
+      { draft: 'leg', canon: 'shoulder' },
+      { draft: 'shoulder', canon: 'leg' },
+      { draft: 'heel', canon: 'shoulder' },
+      { draft: 'shoulder', canon: 'heel' },
+    ],
+  },
+  {
+    // Widowed → later "married" without acknowledging the death is the slip.
+    // Married → widowed is ordinary chronology and must not hard-flag.
+    attribute: 'marital_status',
+    directed: [
+      { draft: 'married', canon: 'widowed' },
+      { draft: 'married', canon: 'widow' },
+      { draft: 'married', canon: 'widower' },
+    ],
+  },
+];
+
+const STOP = new Set([
+  'a',
+  'an',
+  'the',
+  'of',
+  'in',
+  'on',
+  'at',
+  'to',
+  'for',
+  'and',
+  'or',
+  'with',
+  'his',
+  'her',
+  'my',
+  'is',
+  'was',
+  'are',
+  'be',
+  'as',
+  'from',
+  'by',
+]);
+
+function tokens(value: string): Set<string> {
+  return new Set(
+    value
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .split(/\s+/)
+      .filter((t) => t.length > 2 && !STOP.has(t)),
+  );
+}
+
+function valuesCompatible(a: string, b: string): boolean {
+  const left = a.toLowerCase().trim();
+  const right = b.toLowerCase().trim();
+  if (left === right) return true;
+  if (left.includes(right) || right.includes(left)) return true;
+  const ta = tokens(left);
+  const tb = tokens(right);
+  if (ta.size === 0 || tb.size === 0) return false;
+  let overlap = 0;
+  for (const t of ta) if (tb.has(t)) overlap += 1;
+  // ≥50% of the smaller token set overlapping → treat as restatement / refinement.
+  return overlap / Math.min(ta.size, tb.size) >= 0.5;
+}
+
+function hasWord(haystack: string, needle: string): boolean {
+  // Word-boundary match so "unmarried" does not count as "married".
+  const re = new RegExp(
+    `(^|[^a-z0-9])${needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([^a-z0-9]|$)`,
+    'i',
+  );
+  return re.test(haystack);
+}
+
+function hardIncompatible(
+  attr: string,
+  draftValue: string,
+  canonValue: string,
+): boolean {
+  const entry = HARD_INCOMPATIBLE.find(
+    (h) => h.attribute.toLowerCase() === attr.toLowerCase(),
+  );
+  if (!entry) return false;
+  const draft = draftValue.toLowerCase();
+  const canon = canonValue.toLowerCase();
+  return entry.directed.some(
+    (pair) => hasWord(draft, pair.draft) && hasWord(canon, pair.canon),
+  );
+}
+
 function holmesAdjudicateResponder(user: string): string | null {
   if (!user.includes('Adjudicate the draft claim')) return null;
 
   const draftMatch = /"attribute": "([^"]+)"[\s\S]*?"value": "([^"]+)"/.exec(user);
   const draftAttr = draftMatch?.[1] ?? '';
-  const draftValue = (draftMatch?.[2] ?? '').toLowerCase();
+  const draftValueRaw = draftMatch?.[2] ?? '';
+  const draftValue = draftValueRaw.toLowerCase();
 
   const candidateLines = [
     ...user.matchAll(/- id=(\d+) attr="([^"]+)" value="([^"]+)"/g),
@@ -101,40 +207,48 @@ function holmesAdjudicateResponder(user: string): string | null {
       verdict: 'new_fact',
       severity: 'low',
       explanation: 'No canon claim for this attribute; new fact.',
-      summary: `${draftAttr} = ${draftMatch?.[2] ?? ''}`,
+      summary: `${draftAttr} = ${draftValueRaw}`,
     });
   }
 
+  // Hard conflicts first — soft restatement must not swallow famous slips
+  // (e.g. token overlap between unrelated values).
   for (const m of exact) {
     const id = Number(m[1]);
-    const canonValue = (m[3] ?? '').toLowerCase();
-    if (canonValue === draftValue) {
+    const canonValue = m[3] ?? '';
+    if (!validIds.has(id)) continue;
+    if (hardIncompatible(draftAttr, draftValue, canonValue)) {
+      return JSON.stringify({
+        verdict: 'contradiction',
+        severity: 'high',
+        explanation: `Draft says ${JSON.stringify(draftValueRaw)} but canon says ${JSON.stringify(canonValue)}.`,
+        canon_claim_id: id,
+        summary: `Draft contradicts canon on ${draftAttr}.`,
+      });
+    }
+  }
+
+  // Prefer consistency / soft restatement over contradiction (precision rule).
+  for (const m of exact) {
+    const id = Number(m[1]);
+    const canonValue = m[3] ?? '';
+    if (valuesCompatible(draftValue, canonValue)) {
       return JSON.stringify({
         verdict: 'consistent',
         severity: 'low',
-        explanation: 'Restates canon.',
+        explanation: 'Restates or refines canon.',
         canon_claim_id: id,
       });
     }
   }
 
-  const hit = exact[0]!;
-  const canonClaimId = Number(hit[1]);
-  if (!validIds.has(canonClaimId)) {
-    return JSON.stringify({
-      verdict: 'needs_human',
-      severity: 'medium',
-      explanation: 'Cannot cite a canon claim id not present in candidates.',
-      canon_claim_id: null,
-    });
-  }
-
   return JSON.stringify({
-    verdict: 'contradiction',
-    severity: 'high',
-    explanation: `Draft says ${JSON.stringify(draftMatch?.[2])} but canon says ${JSON.stringify(hit[3])}.`,
-    canon_claim_id: canonClaimId,
-    summary: `Draft contradicts canon on ${draftAttr}.`,
+    verdict: 'needs_human',
+    severity: 'medium',
+    explanation:
+      'Values differ for the same attribute but are not a clear contradiction; needs a human.',
+    canon_claim_id: null,
+    summary: `Uncertain whether ${draftAttr} contradicts canon.`,
   });
 }
 

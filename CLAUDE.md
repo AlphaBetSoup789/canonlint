@@ -97,8 +97,13 @@ All four checks must pass before a commit. CI runs them on Linux/macOS/Windows.
 
 ## Milestones
 
-M0 ✅ scaffold · M1 ✅ ingest · M2 ✅ check · M3 Holmes demo · M4 launch.
+M0 ✅ scaffold · M1 ✅ ingest · M2 ✅ check · M3 ✅ Holmes demo · M4 launch.
 Don't start M(n+1) until M(n)'s acceptance test passes. Don't build from the
 deferred list (web UI, branches, vector retrieval, multi-user, hosted).
+
+M3 regen: put PD texts + claim JSON under `HOLMES_CORPUS_ROOT` (default
+`/tmp/holmes-corpus`), then `HOLMES_STRICT=1 npm run demo:holmes`. Never commit
+the corpus or `.canonlint/` database — only `demo/holmes-continuity-report.md`
+and `scripts/holmes/*`.
 
 `/clear` between milestones.

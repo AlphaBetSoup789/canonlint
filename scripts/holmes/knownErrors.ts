@@ -35,7 +35,7 @@ export const KNOWN_ERROR_PATTERNS: readonly KnownErrorPattern[] = [
     title: "Watson's wandering war wound",
     blurb:
       'Dr. Watson cannot seem to agree whether his Afghan bullet struck his leg or his shoulder. ' +
-      'Doyle was famously casual about Watson\'s biography — canonlint catches each fresh placement.',
+      "Doyle was famously casual about Watson's biography — canonlint catches each fresh placement.",
     match: (f) =>
       entityMatches(f, 'watson') &&
       attributeMatches(f, 'wound', 'injury', 'shoulder', 'leg', 'arm') &&
@@ -46,10 +46,12 @@ export const KNOWN_ERROR_PATTERNS: readonly KnownErrorPattern[] = [
     title: 'Mary Morstan / Mary Watson',
     blurb:
       'Mary appears in *The Sign of the Four*, marries Watson, then quietly vanishes from the record ' +
-      'while Watson\'s domestic situation keeps shifting. Timeline and marital-status claims are a ' +
+      "while Watson's domestic situation keeps shifting. Timeline and marital-status claims are a " +
       'fertile hunting ground.',
     match: (f) =>
-      entityMatches(f, 'mary morstan', 'mary watson', 'mrs. watson', 'mrs watson') &&
+      (entityMatches(f, 'mary morstan', 'mary watson', 'mrs. watson', 'mrs watson') ||
+        (entityMatches(f, 'watson') &&
+          attributeMatches(f, 'marital', 'wife', 'widow'))) &&
       (f.kind === 'contradiction' || f.kind === 'timeline'),
   },
   {
@@ -59,16 +61,17 @@ export const KNOWN_ERROR_PATTERNS: readonly KnownErrorPattern[] = [
       'The good doctor is John H. Watson in most accounts, but "James" slips through in places. ' +
       'Alias resolution helps; attribute clashes still flag the inconsistency.',
     match: (f) =>
-      entityMatches(f, 'watson', 'john', 'james') &&
+      entityMatches(f, 'watson') &&
       attributeMatches(f, 'name', 'first name', 'christian name', 'given name') &&
       f.kind === 'contradiction',
   },
   {
     id: 'holmes-residence',
-    title: "221B and Baker Street",
+    title: '221B and Baker Street',
     blurb:
-      'Holmes and Watson\'s shared rooms at 221B Baker Street are canonical — until a later story ' +
-      'rearranges the furniture, the address, or who lives there.',
+      "Holmes and Watson's shared rooms at 221B Baker Street are canonical — until a later story " +
+      'rearranges the furniture, the address, or who lives there. Soft restatements of the same ' +
+      'address ("Baker Street" vs "221B Baker Street") stay out of Contradictions.',
     match: (f) =>
       entityMatches(f, 'holmes', 'watson', 'baker street', '221b') &&
       attributeMatches(f, 'residence', 'address', 'home', 'rooms', 'lodging') &&
@@ -79,7 +82,7 @@ export const KNOWN_ERROR_PATTERNS: readonly KnownErrorPattern[] = [
     title: 'Moriarty at the Reichenbach Fall',
     blurb:
       'The Napoleon of crime plunges at Reichenbach; Holmes returns in *The Empty House*. ' +
-      'Claims about Moriarty\'s fate and Holmes\'s absence should not casually coexist.',
+      "Claims about Moriarty's fate and Holmes's absence should not casually coexist.",
     match: (f) =>
       entityMatches(f, 'moriarty', 'reichenbach', 'holmes') &&
       attributeMatches(f, 'death', 'alive', 'survival', 'fate', 'disappearance') &&
@@ -87,8 +90,6 @@ export const KNOWN_ERROR_PATTERNS: readonly KnownErrorPattern[] = [
   },
 ];
 
-export function knownPatternsForFinding(
-  finding: CheckFinding,
-): KnownErrorPattern[] {
+export function knownPatternsForFinding(finding: CheckFinding): KnownErrorPattern[] {
   return KNOWN_ERROR_PATTERNS.filter((p) => p.match(finding));
 }

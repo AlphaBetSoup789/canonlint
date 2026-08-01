@@ -20,9 +20,9 @@ Contradictions (2)
   ...
 ```
 
-> **Status: early.** M2 is complete — `init`, `stats`, `ingest`, `entity`,
-> `check`, and `merge` work. The Holmes continuity demo is M3. See the
-> [roadmap](#roadmap).
+> **Status: early.** M3 is complete — `init`, `stats`, `ingest`, `entity`,
+> `check`, `merge`, and the Holmes continuity demo. See the
+> [roadmap](#roadmap) and [`demo/holmes-continuity-report.md`](demo/holmes-continuity-report.md).
 
 ---
 
@@ -121,6 +121,12 @@ changes that. canonlint is designed for _canon from here forward_, plus
 backfill-as-you-go. The Holmes demo shows backfill works at real-series scale
 (60 works); it is not a claim about 80 years of continuity.
 
+The checked-in Holmes report was regenerated with a deterministic mock provider
+(`npm run demo:holmes`) at **$0 model spend**, so CI and this repo never need
+an API key for M3. A live Anthropic pass over the same corpus is the estimate
+above; set `CANONLINT_PROVIDER=anthropic` (and a key) when you want the model
+to extract claims itself.
+
 Running locally with Ollama costs nothing but electricity.
 
 ## Your canon database never leaves your machine
@@ -197,8 +203,9 @@ point it at its replacement. The history of your canon stays readable.
 - **M0 — Scaffold** ✅ schema, migrations, provider adapters, `init`, `stats`
 - **M1 — Ingest** ✅ extraction, entity resolution, provenance, `entity`
 - **M2 — Check** ✅ pairwise adjudication, continuity report, `merge`
-- **M3 — The Holmes demo** — all 60 stories in publication order, and a report
-  of every continuity error Doyle made
+- **M3 — The Holmes demo** ✅ publication-order backfill of all 60 stories;
+  see [`demo/holmes-continuity-report.md`](demo/holmes-continuity-report.md)
+  (`npm run demo:holmes` regenerates it when a local corpus is present)
 - **M4 — Launch surface**
 
 ## Support & maintenance
