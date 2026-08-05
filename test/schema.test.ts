@@ -104,6 +104,19 @@ describe('enum constraints', () => {
     ).toThrow();
   });
 
+  it('accepts figurative modality after migration 002', () => {
+    const { entity, source } = seed(db);
+    const claim = insertClaim(db, {
+      entity_id: entity.id,
+      attribute: 'status',
+      value: 'the bird has flown',
+      modality: 'figurative',
+      status: 'canon',
+      source_id: source.id,
+    });
+    expect(claim.modality).toBe('figurative');
+  });
+
   it('rejects an unknown entity kind', () => {
     // @ts-expect-error deliberately invalid
     expect(() => insertEntity(db, { name: 'The Fog', kind: 'weather' })).toThrow();

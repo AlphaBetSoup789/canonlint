@@ -52,6 +52,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "demo:holmes": "tsx scripts/holmes-demo.ts",
+    "demo:holmes-live": "tsx scripts/holmes-live.ts",
+    "demo:holmes-live:12": "HOLMES_LIMIT=12 HOLMES_LIVE_BUDGET_USD=10 HOLMES_LIVE_CWD=/tmp/canonlint-holmes-m35 tsx scripts/holmes-live.ts",
     "prepublishOnly": "npm run build"
   },
   "dependencies": {

@@ -19,6 +19,7 @@ function claim(
   return {
     entity_kind: 'character',
     entity_aliases: [],
+    subject_specificity: 'named',
     modality: 'asserted',
     confidence: 0.9,
     valid_from: null,

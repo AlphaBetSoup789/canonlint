@@ -99,12 +99,20 @@ export function runMigrations(db: Db): number[] {
 
   const applied: number[] = [];
   for (const migration of pending) {
-    const apply = db.transaction(() => {
-      db.exec(migration.up);
-      record.run(migration.version, migration.name);
-    });
-    apply();
-    applied.push(migration.version);
+    // Some migrations rebuild tables (SQLite cannot ALTER CHECK). That requires
+    // foreign_keys OFF, and the pragma is a no-op inside a transaction — so
+    // flip it around the transaction, not inside migration SQL.
+    db.pragma('foreign_keys = OFF');
+    try {
+      const apply = db.transaction(() => {
+        db.exec(migration.up);
+        record.run(migration.version, migration.name);
+      });
+      apply();
+      applied.push(migration.version);
+    } finally {
+      db.pragma('foreign_keys = ON');
+    }
   }
 
   return applied;

@@ -5,6 +5,7 @@ import { openDb, type Db } from '../db/index.js';
 import {
   findClaims,
   findCitedClaims,
+  findEntityWorkAnomalies,
   insertClaim,
   insertRun,
   insertSource,
@@ -171,13 +172,22 @@ export async function runIngest(options: IngestOptions): Promise<IngestResult> {
     let claimsProposed = 0;
 
     for (const claim of extracted) {
+      if (claim.subject_specificity === 'generic') {
+        // Generics are dropped — storing them creates Achmet-style magnets.
+        continue;
+      }
+
       const resolved = await resolveEntity(db, llm, {
         name: claim.entity_name,
         kind: claim.entity_kind,
         aliases: claim.entity_aliases,
+        subjectSpecificity: claim.subject_specificity,
+        workId: work.id,
+        workTitle: work.title,
       });
       usage = addUsage(usage, resolved.usage);
-      if (!resolved.entity) {
+      if (resolved.dropped || !resolved.entity) {
+        if (resolved.dropped) continue;
         // Ingest always creates entities; this is defensive.
         throw new CanonlintError(
           `Failed to resolve entity "${claim.entity_name}" during ingest.`,
@@ -234,6 +244,14 @@ export async function runIngest(options: IngestOptions): Promise<IngestResult> {
     }
 
     const actualUsd = llm.costOf(usage);
+    const anomalies = findEntityWorkAnomalies(db);
+    for (const a of anomalies) {
+      warnings.push(
+        `Entity anomaly: "${a.name}" (${a.kind}) has canon claims from ` +
+          `${a.workCount} works — review before trusting contradiction reports.`,
+      );
+    }
+
     updateRunStats(db, run.id, {
       status: 'ok',
       chunks: chunks.length,
@@ -247,6 +265,11 @@ export async function runIngest(options: IngestOptions): Promise<IngestResult> {
       actualUsd,
       usage,
       warnings,
+      entityAnomalies: anomalies.map((a) => ({
+        name: a.name,
+        kind: a.kind,
+        workCount: a.workCount,
+      })),
     });
 
     for (const warning of warnings) {

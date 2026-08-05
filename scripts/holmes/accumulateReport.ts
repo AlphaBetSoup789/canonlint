@@ -1,4 +1,9 @@
-import type { CheckFinding, CheckReport } from '../../src/check/report.js';
+import {
+  clusterFindings,
+  type CheckFinding,
+  type CheckReport,
+} from '../../src/check/report.js';
+import { formatUsd } from '../../src/llm/pricing.js';
 import type { HolmesWork } from './manifest.js';
 import { KNOWN_ERROR_PATTERNS, knownPatternsForFinding } from './knownErrors.js';
 
@@ -9,6 +14,17 @@ export interface HolmesStoryEntry {
   skipped: boolean;
   skipReason?: string;
   report?: CheckReport;
+}
+
+export interface HolmesReportMeta {
+  /** 'mock' for demo:holmes; 'live' for demo:holmes-live. */
+  mode: 'mock' | 'live';
+  provider?: string;
+  model?: string;
+  /** ISO date of the run. */
+  date?: string;
+  /** Cumulative model spend in USD. */
+  costUsd?: number;
 }
 
 export interface HolmesAccumulatedReport {
@@ -24,10 +40,12 @@ export interface HolmesAccumulatedReport {
   findings: Array<
     CheckFinding & { workId: string; storyTitle: string; storyOrder: number }
   >;
+  meta?: HolmesReportMeta;
 }
 
 export function createEmptyAccumulatedReport(
   works: HolmesWork[],
+  meta?: HolmesReportMeta,
 ): HolmesAccumulatedReport {
   return {
     storiesTotal: works.length,
@@ -45,6 +63,7 @@ export function createEmptyAccumulatedReport(
       skipped: false,
     })),
     findings: [],
+    meta: meta ?? { mode: 'mock' },
   };
 }
 
@@ -107,8 +126,12 @@ export function markStoryIngested(
   acc.storiesIngested += 1;
 }
 
-function renderFinding(f: HolmesAccumulatedReport['findings'][number]): string[] {
-  const lines = [`#### ${f.summary}`, ''];
+function renderFinding(
+  f: HolmesAccumulatedReport['findings'][number],
+  occurrences = 1,
+): string[] {
+  const suffix = occurrences > 1 ? ` (${occurrences} occurrences)` : '';
+  const lines = [`#### ${f.summary}${suffix}`, ''];
   if (f.canon) {
     lines.push(
       `- **canon** ${f.canon.workTitle}, ${f.canon.locator} — "${f.canon.excerpt}"`,
@@ -119,6 +142,44 @@ function renderFinding(f: HolmesAccumulatedReport['findings'][number]): string[]
   return lines;
 }
 
+function renderHowProduced(meta: HolmesReportMeta | undefined): string[] {
+  const mode = meta?.mode ?? 'mock';
+  if (mode === 'live') {
+    const provider = meta?.provider ?? 'unknown';
+    const model = meta?.model ?? 'unknown';
+    const date = meta?.date ?? new Date().toISOString().slice(0, 10);
+    const cost =
+      meta?.costUsd !== undefined ? formatUsd(meta.costUsd) : '(cost not recorded)';
+    return [
+      '## How this was produced',
+      '',
+      '1. Ingest each story into a local canon database in publication order.',
+      '2. Before ingesting story *n*, run `canonlint check` against stories 1…*n−1*.',
+      '3. Keep every contradiction that can cite a real canon excerpt',
+      '   (precision over recall — uncertain calls stay out of this list).',
+      '',
+      `**Live run** — provider \`${provider}\`, model \`${model}\`, date ${date},`,
+      `**${cost} model spend**. Regenerated with \`npm run demo:holmes-live\`.`,
+      '',
+    ];
+  }
+  return [
+    '## How this was produced',
+    '',
+    '1. Ingest each story into a local canon database in publication order.',
+    '2. Before ingesting story *n*, run `canonlint check` against stories 1…*n−1*.',
+    '3. Keep every contradiction that can cite a real canon excerpt',
+    '   (precision over recall — uncertain calls stay out of this list).',
+    '',
+    'This checked-in report was regenerated with the deterministic Holmes mock',
+    'provider (`npm run demo:holmes`) — **$0 model spend**. A live',
+    'ingest of the same ~650k-word corpus is the single-digit-to-low-double-digit',
+    'dollar estimate from the README; swap `CANONLINT_PROVIDER` when',
+    'you want the model, not the agent, to extract claims.',
+    '',
+  ];
+}
+
 /**
  * Render the Holmes continuity report: fun narrative for known patterns,
  * then every cited contradiction. New-fact noise is summarised as a count.
@@ -126,6 +187,8 @@ function renderFinding(f: HolmesAccumulatedReport['findings'][number]): string[]
 export function renderHolmesContinuityMarkdown(acc: HolmesAccumulatedReport): string {
   const contradictions = acc.findings.filter((f) => f.kind === 'contradiction');
   const timeline = acc.findings.filter((f) => f.kind === 'timeline');
+  const clusteredContradictions = clusterFindings(contradictions);
+  const clusteredTimeline = clusterFindings(timeline);
 
   const lines: string[] = [
     '# Doyle vs Doyle: a Holmes continuity report',
@@ -138,27 +201,16 @@ export function renderHolmesContinuityMarkdown(acc: HolmesAccumulatedReport): st
     '[Project Gutenberg](https://www.gutenberg.org/); short excerpts only.',
     'Built with [canonlint](https://github.com/AlphaBetSoup789/canonlint).',
     '',
-    '## How this was produced',
-    '',
-    '1. Ingest each story into a local canon database in publication order.',
-    '2. Before ingesting story *n*, run `canonlint check` against stories 1…*n−1*.',
-    '3. Keep every contradiction that can cite a real canon excerpt',
-    '   (precision over recall — uncertain calls stay out of this list).',
-    '',
-    'This checked-in report was regenerated with the deterministic Holmes mock',
-    'provider (`npm run demo:holmes`) — **$0 model spend**. A live Anthropic',
-    'ingest of the same ~650k-word corpus is the single-digit-to-low-double-digit',
-    'dollar estimate from the README; swap `CANONLINT_PROVIDER=anthropic` when',
-    'you want the model, not the agent, to extract claims.',
-    '',
+    ...renderHowProduced(acc.meta),
     '## Scoreboard',
     '',
     `| | |`,
     `| --- | ---: |`,
     `| Stories ingested | ${acc.storiesIngested} |`,
     `| Checks run | ${acc.storiesChecked} |`,
-    `| Contradictions with citations | ${contradictions.length} |`,
-    `| Timeline issues | ${timeline.length} |`,
+    `| Distinct contradictions | ${clusteredContradictions.length} |`,
+    `| Raw contradiction rows | ${contradictions.length} |`,
+    `| Timeline issues | ${clusteredTimeline.length} |`,
     `| New facts (not listed below) | ${acc.newFacts} |`,
     `| Uncertain (routed away from Contradictions) | ${acc.uncertain} |`,
     '',
@@ -185,8 +237,14 @@ export function renderHolmesContinuityMarkdown(acc: HolmesAccumulatedReport): st
       const bucket = narrativeFindings.get(pattern.id);
       if (!bucket || bucket.length === 0) continue;
       lines.push(`### ${pattern.title}`, '', pattern.blurb, '');
-      for (const f of bucket) {
-        lines.push(...renderFinding(f));
+      const clustered = clusterFindings(bucket);
+      for (const c of clustered) {
+        lines.push(
+          ...renderFinding(
+            c.finding as HolmesAccumulatedReport['findings'][number],
+            c.occurrences,
+          ),
+        );
       }
     }
 
@@ -199,16 +257,26 @@ export function renderHolmesContinuityMarkdown(acc: HolmesAccumulatedReport): st
         'gate — each one cites a real earlier excerpt.',
         '',
       );
-      for (const f of other) {
-        lines.push(...renderFinding(f));
+      for (const c of clusterFindings(other)) {
+        lines.push(
+          ...renderFinding(
+            c.finding as HolmesAccumulatedReport['findings'][number],
+            c.occurrences,
+          ),
+        );
       }
     }
   }
 
   if (timeline.length > 0) {
     lines.push('## Timeline issues', '');
-    for (const f of timeline) {
-      lines.push(...renderFinding(f));
+    for (const c of clusteredTimeline) {
+      lines.push(
+        ...renderFinding(
+          c.finding as HolmesAccumulatedReport['findings'][number],
+          c.occurrences,
+        ),
+      );
     }
   }
 

@@ -21,6 +21,14 @@ export const PRICE_TABLE: Readonly<Record<string, ModelPrice>> = {
   'claude-sonnet-5': { inputPerMTok: 3, outputPerMTok: 15 },
   'claude-sonnet-4-6': { inputPerMTok: 3, outputPerMTok: 15 },
   'claude-haiku-4-5': { inputPerMTok: 1, outputPerMTok: 5 },
+
+  // OpenAI-compatible hosts. Prices move faster than releases — override with
+  // CANONLINT_PRICE_INPUT_PER_MTOK / _OUTPUT_ rather than waiting for a bump.
+  // Venice, last checked 2026-07-31.
+  'deepseek-v3.2': { inputPerMTok: 0.33, outputPerMTok: 0.48 },
+  'deepseek-v4-pro': { inputPerMTok: 1.65, outputPerMTok: 3.3 },
+  'deepseek-v4-flash': { inputPerMTok: 0.138, outputPerMTok: 0.275 },
+  'deepseek-v4-flash-0731': { inputPerMTok: 0.072, outputPerMTok: 0.144 },
 };
 
 /** Used when a model is not in the table, so estimates stay conservative. */
@@ -84,7 +92,7 @@ export function estimateRunCost(options: {
   const outputTokens = Math.ceil(inputTokens * outputRatio);
   const price = priceFor(config.model, config);
   const usd =
-    config.provider === 'anthropic'
+    config.provider === 'anthropic' || config.provider === 'openai-compatible'
       ? costOfUsage(
           {
             inputTokens,
@@ -99,7 +107,9 @@ export function estimateRunCost(options: {
     inputTokens,
     outputTokens,
     usd,
-    priceKnown: config.provider !== 'anthropic' || isPriceKnown(config.model, config),
+    priceKnown:
+      (config.provider !== 'anthropic' && config.provider !== 'openai-compatible') ||
+      isPriceKnown(config.model, config),
     model: config.model,
   };
 }

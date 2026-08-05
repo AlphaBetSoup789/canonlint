@@ -127,6 +127,7 @@ function adjudicateFromPayload(user: string): string {
       severity: 'low',
       explanation: 'No canon claim for this attribute; new fact.',
       summary: `${draftAttr} = ${draftMatch?.[2] ?? ''}`,
+      same_entity_confidence: 1,
     });
   }
 
@@ -139,6 +140,7 @@ function adjudicateFromPayload(user: string): string {
         severity: 'low',
         explanation: 'Restates canon.',
         canon_claim_id: id,
+        same_entity_confidence: 1,
       });
     }
     // Soft match: one contains the other (e.g. residence phrasing).
@@ -148,6 +150,7 @@ function adjudicateFromPayload(user: string): string {
         severity: 'low',
         explanation: 'Compatible with canon.',
         canon_claim_id: id,
+        same_entity_confidence: 1,
       });
     }
   }
@@ -159,5 +162,6 @@ function adjudicateFromPayload(user: string): string {
     explanation: `Draft says ${JSON.stringify(draftMatch?.[2])} but canon says ${JSON.stringify(hit[3])}.`,
     canon_claim_id: Number(hit[1]),
     summary: `Draft contradicts canon on ${draftAttr}.`,
+    same_entity_confidence: 1,
   });
 }

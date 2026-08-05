@@ -14,7 +14,7 @@ import type { ProjectPaths } from './paths.js';
  * through here.
  */
 
-export const PROVIDERS = ['anthropic', 'ollama', 'mock'] as const;
+export const PROVIDERS = ['anthropic', 'openai-compatible', 'ollama', 'mock'] as const;
 export type ProviderName = (typeof PROVIDERS)[number];
 
 export const EFFORT_LEVELS = ['low', 'medium', 'high', 'xhigh', 'max'] as const;
@@ -30,12 +30,19 @@ export type Effort = (typeof EFFORT_LEVELS)[number];
 export const DEFAULTS = {
   provider: 'anthropic' as ProviderName,
   anthropicModel: 'claude-sonnet-5',
+  /**
+   * Default for any OpenAI-compatible host. DeepSeek V3.2 documents structured
+   * output and tool use, has a 160K context, and costs cents for a full corpus.
+   */
+  openAiCompatibleModel: 'deepseek-v3.2',
   ollamaModel: 'llama3.1:8b',
   ollamaUrl: 'http://localhost:11434',
   effort: 'medium' as Effort,
   maxTokens: 8192,
   /** Target chunk size in words when splitting a work for extraction. */
   chunkWords: 900,
+  /** Ollama context window; its own default of 2048 silently truncates chunks. */
+  numCtx: 8192,
   /** Guardrail so a stray `ingest` on a huge corpus cannot silently bill. */
   maxSpendUsd: 5,
   /** Claims at or above this confidence are auto-promoted to canon. */
@@ -47,9 +54,11 @@ const FileConfigSchema = z
     provider: z.enum(PROVIDERS).optional(),
     model: z.string().min(1).optional(),
     ollamaUrl: z.string().url().optional(),
+    apiBaseUrl: z.string().url().optional(),
     effort: z.enum(EFFORT_LEVELS).optional(),
     maxTokens: z.number().int().positive().optional(),
     chunkWords: z.number().int().positive().optional(),
+    numCtx: z.number().int().positive().optional(),
     maxSpendUsd: z.number().nonnegative().optional(),
     autoPromoteConfidence: z.number().min(0).max(1).optional(),
     priceInputPerMTok: z.number().nonnegative().optional(),
@@ -63,9 +72,12 @@ export interface Config {
   provider: ProviderName;
   model: string;
   ollamaUrl: string;
+  /** Base URL for the openai-compatible provider, e.g. Venice. */
+  apiBaseUrl?: string;
   effort: Effort;
   maxTokens: number;
   chunkWords: number;
+  numCtx: number;
   maxSpendUsd: number;
   autoPromoteConfidence: number;
   /** Per-million-token price overrides; undefined falls back to the table. */
@@ -149,7 +161,11 @@ export function resolveConfig(
     DEFAULTS.provider;
 
   const defaultModel =
-    provider === 'ollama' ? DEFAULTS.ollamaModel : DEFAULTS.anthropicModel;
+    provider === 'ollama'
+      ? DEFAULTS.ollamaModel
+      : provider === 'openai-compatible'
+        ? DEFAULTS.openAiCompatibleModel
+        : DEFAULTS.anthropicModel;
 
   const config: Config = {
     provider,
@@ -170,6 +186,7 @@ export function resolveConfig(
       envNumber('CANONLINT_CHUNK_WORDS') ??
       fileConfig.chunkWords ??
       DEFAULTS.chunkWords,
+    numCtx: envNumber('CANONLINT_NUM_CTX') ?? fileConfig.numCtx ?? DEFAULTS.numCtx,
     maxSpendUsd:
       overrides.maxSpendUsd ??
       envNumber('CANONLINT_MAX_SPEND_USD') ??
@@ -188,7 +205,12 @@ export function resolveConfig(
   if (priceIn !== undefined) config.priceInputPerMTok = priceIn;
   if (priceOut !== undefined) config.priceOutputPerMTok = priceOut;
 
-  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const apiBaseUrl = process.env.CANONLINT_API_BASE_URL ?? fileConfig.apiBaseUrl;
+  if (apiBaseUrl) config.apiBaseUrl = apiBaseUrl;
+
+  // CANONLINT_API_KEY is provider-agnostic; ANTHROPIC_API_KEY stays supported
+  // so an existing Anthropic setup keeps working untouched.
+  const apiKey = process.env.CANONLINT_API_KEY ?? process.env.ANTHROPIC_API_KEY;
   if (apiKey) config.apiKey = apiKey;
 
   return config;

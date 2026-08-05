@@ -23,6 +23,14 @@ export interface CheckFinding {
   };
 }
 
+export interface ClusteredFinding {
+  /** Representative finding (first occurrence). */
+  finding: CheckFinding;
+  /** entity_name + attribute key. */
+  key: string;
+  occurrences: number;
+}
+
 export interface CheckReport {
   runId: number;
   draftPath: string;
@@ -38,10 +46,35 @@ export interface CheckReport {
   model: string;
   provider: string;
   warnings: string[];
+  /** Entities whose claims span suspiciously many works (M3.5 anomaly). */
+  entityAnomalies?: { name: string; kind: string; workCount: number }[];
 }
 
-function printFinding(finding: CheckFinding, draftPath: string): void {
-  log.info(`  ${finding.summary}`);
+/**
+ * Group findings by (entity_name, attribute) so repeated magnets collapse
+ * to one row with an occurrence count.
+ */
+export function clusterFindings(findings: CheckFinding[]): ClusteredFinding[] {
+  const order: string[] = [];
+  const map = new Map<string, ClusteredFinding>();
+  for (const finding of findings) {
+    const entity = finding.draft.claim.entity_name;
+    const attr = finding.draft.claim.attribute;
+    const key = `${entity.toLowerCase()}::${attr.toLowerCase()}`;
+    const existing = map.get(key);
+    if (existing) {
+      existing.occurrences += 1;
+    } else {
+      order.push(key);
+      map.set(key, { finding, key, occurrences: 1 });
+    }
+  }
+  return order.map((k) => map.get(k)!);
+}
+
+function printFinding(finding: CheckFinding, draftPath: string, occurrences = 1): void {
+  const suffix = occurrences > 1 ? ` (${occurrences} occurrences)` : '';
+  log.info(`  ${finding.summary}${suffix}`);
   if (finding.canon) {
     log.info(
       `    canon   ${finding.canon.workTitle}, ${finding.canon.locator} — ` +
@@ -56,15 +89,16 @@ function printFinding(finding: CheckFinding, draftPath: string): void {
 }
 
 function section(title: string, findings: CheckFinding[], draftPath: string): void {
-  log.info(style.bold(`${title} (${findings.length})`));
+  const clustered = clusterFindings(findings);
+  log.info(style.bold(`${title} (${clustered.length} distinct, ${findings.length} raw)`));
   log.info('');
-  if (findings.length === 0) {
+  if (clustered.length === 0) {
     log.detail('none');
     log.info('');
     return;
   }
-  for (const finding of findings) {
-    printFinding(finding, draftPath);
+  for (const cluster of clustered) {
+    printFinding(cluster.finding, draftPath, cluster.occurrences);
   }
 }
 
@@ -91,6 +125,14 @@ export function printCheckReport(report: CheckReport): void {
         '(treated as new facts / skipped for contradiction).',
     );
   }
+  if (report.entityAnomalies && report.entityAnomalies.length > 0) {
+    log.warn(
+      `${report.entityAnomalies.length} entit(y/ies) span >8 works — review before trusting the report:`,
+    );
+    for (const a of report.entityAnomalies) {
+      log.warn(`  ${a.name} (${a.kind}): ${a.workCount} works`);
+    }
+  }
   for (const warning of report.warnings) {
     log.warn(warning);
   }
@@ -105,6 +147,7 @@ export function reportToJson(report: CheckReport): unknown {
     runId: report.runId,
     draftPath: report.draftPath,
     contradictions: report.contradictions,
+    contradictionsClustered: clusterFindings(report.contradictions),
     timeline: report.timeline,
     newFacts: report.newFacts,
     uncertain: report.uncertain,
@@ -115,6 +158,7 @@ export function reportToJson(report: CheckReport): unknown {
     model: report.model,
     provider: report.provider,
     warnings: report.warnings,
+    entityAnomalies: report.entityAnomalies ?? [],
     usage: report.usage,
   };
 }

@@ -39,6 +39,13 @@ export class OllamaProvider implements LlmProvider {
       ],
       options: {
         num_predict: request.maxTokens ?? this.config.maxTokens,
+        // Ollama defaults num_ctx to 2048 regardless of what the model
+        // supports. A ~900-word chunk plus the system prompt and schema
+        // overflows that, and Ollama truncates silently rather than erroring —
+        // which reads as a weak prompt when it is actually a config bug.
+        num_ctx: this.config.numCtx,
+        // Extraction must be reproducible. Ollama's default is 0.8.
+        temperature: 0,
       },
     };
     if (request.jsonSchema) {

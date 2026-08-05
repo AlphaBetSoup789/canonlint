@@ -4,7 +4,14 @@ export type Modality =
   | 'believed' // a character believes it; may be wrong
   | 'reported' // secondhand, hearsay, newspaper
   | 'vision_or_dream' // dream, hallucination, prophecy
-  | 'lie'; // stated by a character known to be lying
+  | 'lie' // stated by a character known to be lying
+  | 'figurative'; // idiom / metaphor — stored, never adjudicated (M3.5)
+
+/**
+ * How specifically the claim's subject is named in the text.
+ * Only `named` subjects are eligible for cross-work entity resolution.
+ */
+export type SubjectSpecificity = 'named' | 'definite_description' | 'generic';
 
 export type EntityKind = 'character' | 'place' | 'object' | 'faction' | 'event';
 
@@ -24,6 +31,13 @@ export const MODALITIES: readonly Modality[] = [
   'reported',
   'vision_or_dream',
   'lie',
+  'figurative',
+];
+
+export const SUBJECT_SPECIFICITIES: readonly SubjectSpecificity[] = [
+  'named',
+  'definite_description',
+  'generic',
 ];
 
 export const ENTITY_KINDS: readonly EntityKind[] = [
@@ -33,6 +47,9 @@ export const ENTITY_KINDS: readonly EntityKind[] = [
   'faction',
   'event',
 ];
+
+/** Entities with claims from more than this many works are flagged for review. */
+export const ENTITY_WORK_ANOMALY_THRESHOLD = 8;
 
 export const DEFAULT_BRANCH = 'main';
 

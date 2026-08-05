@@ -3,6 +3,7 @@ import { getSchemaVersion } from './index.js';
 import { CanonlintError } from '../util/errors.js';
 import {
   DEFAULT_BRANCH,
+  ENTITY_WORK_ANOMALY_THRESHOLD,
   type Claim,
   type Conflict,
   type DbStats,
@@ -155,6 +156,102 @@ export function listEntities(db: Db, kind?: NewEntity['kind']): Entity[] {
   return db
     .prepare('SELECT * FROM entities ORDER BY name COLLATE NOCASE')
     .all() as Entity[];
+}
+
+/**
+ * Entities that already have at least one claim sourced from `workId`.
+ * Used to scope non-`named` subject resolution to the current work (M3.5).
+ */
+export function listEntitiesInWork(
+  db: Db,
+  workId: number,
+  kind?: NewEntity['kind'],
+): Entity[] {
+  if (kind) {
+    return db
+      .prepare(
+        `SELECT DISTINCT e.*
+         FROM entities e
+         JOIN claims c ON c.entity_id = e.id
+         JOIN sources s ON s.id = c.source_id
+         WHERE s.work_id = ? AND e.kind = ?
+         ORDER BY e.name COLLATE NOCASE`,
+      )
+      .all(workId, kind) as Entity[];
+  }
+  return db
+    .prepare(
+      `SELECT DISTINCT e.*
+       FROM entities e
+       JOIN claims c ON c.entity_id = e.id
+       JOIN sources s ON s.id = c.source_id
+       WHERE s.work_id = ?
+       ORDER BY e.name COLLATE NOCASE`,
+    )
+    .all(workId) as Entity[];
+}
+
+export function entityHasClaimsInWork(
+  db: Db,
+  entityId: number,
+  workId: number,
+): boolean {
+  const row = db
+    .prepare(
+      `SELECT 1 AS ok
+       FROM claims c
+       JOIN sources s ON s.id = c.source_id
+       WHERE c.entity_id = ? AND s.work_id = ?
+       LIMIT 1`,
+    )
+    .get(entityId, workId) as { ok: number } | undefined;
+  return row !== undefined;
+}
+
+export interface EntityWorkAnomaly {
+  entityId: number;
+  name: string;
+  kind: string;
+  workCount: number;
+  works: string[];
+}
+
+/**
+ * Entities whose canon claims span more than `threshold` distinct works.
+ * A magnet like Achmet (claims from dozens of stories) trips this immediately.
+ */
+export function findEntityWorkAnomalies(
+  db: Db,
+  threshold = ENTITY_WORK_ANOMALY_THRESHOLD,
+): EntityWorkAnomaly[] {
+  const rows = db
+    .prepare(
+      `SELECT e.id AS entityId, e.name, e.kind,
+              COUNT(DISTINCT s.work_id) AS workCount,
+              GROUP_CONCAT(DISTINCT w.title) AS worksCsv
+       FROM entities e
+       JOIN claims c ON c.entity_id = e.id AND c.status = 'canon'
+       JOIN sources s ON s.id = c.source_id
+       JOIN works w ON w.id = s.work_id
+       GROUP BY e.id
+       HAVING workCount > ?
+       ORDER BY workCount DESC, e.name COLLATE NOCASE`,
+    )
+    .all(threshold) as {
+    entityId: number;
+    name: string;
+    kind: string;
+    workCount: number;
+    worksCsv: string;
+  }[];
+
+  return rows.map((r) => ({
+    entityId: r.entityId,
+    name: r.name,
+    kind: r.kind,
+    workCount: r.workCount,
+    works: r.worksCsv ? r.worksCsv.split(',') : [],
+  }));
 }
 
 /**

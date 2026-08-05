@@ -4,6 +4,7 @@ import { loadConfig, type ConfigOverrides } from '../config.js';
 import { openDb } from '../db/index.js';
 import {
   findCandidateClaims,
+  findEntityWorkAnomalies,
   getCitedClaimById,
   insertConflict,
   insertRun,
@@ -13,9 +14,11 @@ import { DEFAULT_BRANCH } from '../db/types.js';
 import {
   adjudicateClaim,
   defaultSummary,
+  effectiveSummary,
   toConflictKind,
 } from '../check/adjudicate.js';
 import {
+  clusterFindings,
   printCheckReport,
   reportToJson,
   type CheckFinding,
@@ -114,10 +117,16 @@ export async function runCheck(options: CheckOptions): Promise<CheckResult> {
     };
 
     for (const draftClaim of extracted) {
+      // Figurative claims are stored on ingest but never adjudicated (M3.5).
+      if (draftClaim.modality === 'figurative') {
+        continue;
+      }
+
       const resolved = await resolveEntity(db, llm, {
         name: draftClaim.entity_name,
         kind: draftClaim.entity_kind,
         aliases: draftClaim.entity_aliases,
+        subjectSpecificity: draftClaim.subject_specificity,
         createIfMissing: false,
         // Linting a draft must not have side effects on canon — no alias writes.
         mutate: false,
@@ -125,7 +134,11 @@ export async function runCheck(options: CheckOptions): Promise<CheckResult> {
       usage = addUsage(usage, resolved.usage);
       assertWithinSpendCap();
 
-      if (!resolved.entity) {
+      if (resolved.dropped || !resolved.entity) {
+        if (resolved.dropped) {
+          claimsChecked += 1;
+          continue;
+        }
         entitiesUnresolved += 1;
         // Unknown entity → treat as new fact (nothing in canon to contradict).
         const finding: CheckFinding = {
@@ -159,7 +172,7 @@ export async function runCheck(options: CheckOptions): Promise<CheckResult> {
         attribute: draftClaim.attribute,
         branch: DEFAULT_BRANCH,
         status: 'canon',
-      });
+      }).filter((c) => c.modality !== 'figurative');
 
       const {
         adjudication,
@@ -182,6 +195,8 @@ export async function runCheck(options: CheckOptions): Promise<CheckResult> {
       claimsChecked += 1;
       if (kind === null) continue;
 
+      const summary = effectiveSummary(adjudication, draftClaim, entity.name);
+
       let canon: CheckFinding['canon'] | undefined;
       if (
         (kind === 'contradiction' || kind === 'timeline') &&
@@ -195,7 +210,7 @@ export async function runCheck(options: CheckOptions): Promise<CheckResult> {
           uncertain.push({
             kind: 'uncertain',
             severity: adjudication.severity,
-            summary: adjudication.summary ?? defaultSummary(draftClaim, entity.name),
+            summary,
             explanation:
               adjudication.explanation +
               ' [missing canon citation; routed to Uncertain]',
@@ -227,7 +242,7 @@ export async function runCheck(options: CheckOptions): Promise<CheckResult> {
       const finding: CheckFinding = {
         kind,
         severity: adjudication.severity,
-        summary: adjudication.summary ?? defaultSummary(draftClaim, entity.name),
+        summary,
         explanation: adjudication.explanation,
         draft: {
           path: draftPath,
@@ -253,6 +268,14 @@ export async function runCheck(options: CheckOptions): Promise<CheckResult> {
       });
     }
 
+    const anomalies = findEntityWorkAnomalies(db);
+    for (const a of anomalies) {
+      warnings.push(
+        `Entity anomaly: "${a.name}" (${a.kind}) has canon claims from ` +
+          `${a.workCount} works — review before trusting contradiction reports.`,
+      );
+    }
+
     const actualUsd = llm.costOf(usage);
     const report: CheckReport = {
       runId: run.id,
@@ -269,6 +292,11 @@ export async function runCheck(options: CheckOptions): Promise<CheckResult> {
       model: llm.model,
       provider: llm.name,
       warnings,
+      entityAnomalies: anomalies.map((a) => ({
+        name: a.name,
+        kind: a.kind,
+        workCount: a.workCount,
+      })),
     };
 
     updateRunStats(db, run.id, {
@@ -301,6 +329,8 @@ function renderMarkdown(report: CheckReport): string {
     `# Continuity report`,
     '',
     `Draft: \`${report.draftPath}\``,
+    `Provider: ${report.provider} / ${report.model}`,
+    `Cost: ${formatUsd(report.actualUsd)} actual (estimated ${formatUsd(report.estimatedUsd)})`,
     '',
   ];
   const sections: [string, CheckFinding[]][] = [
@@ -310,13 +340,20 @@ function renderMarkdown(report: CheckReport): string {
     ['Uncertain', report.uncertain],
   ];
   for (const [title, findings] of sections) {
-    lines.push(`## ${title} (${findings.length})`, '');
-    if (findings.length === 0) {
+    const clustered = clusterFindings(findings);
+    lines.push(
+      `## ${title} (${clustered.length} distinct, ${findings.length} raw)`,
+      '',
+    );
+    if (clustered.length === 0) {
       lines.push('_none_', '');
       continue;
     }
-    for (const f of findings) {
-      lines.push(`### ${f.summary}`, '');
+    for (const cluster of clustered) {
+      const f = cluster.finding;
+      const suffix =
+        cluster.occurrences > 1 ? ` (${cluster.occurrences} occurrences)` : '';
+      lines.push(`### ${f.summary}${suffix}`, '');
       if (f.canon) {
         lines.push(
           `- **canon** ${f.canon.workTitle}, ${f.canon.locator} — "${f.canon.excerpt}"`,
@@ -327,6 +364,13 @@ function renderMarkdown(report: CheckReport): string {
       );
       lines.push(`- ${f.explanation}`, '');
     }
+  }
+  if (report.entityAnomalies && report.entityAnomalies.length > 0) {
+    lines.push('## Entity anomalies (review before publishing)', '');
+    for (const a of report.entityAnomalies) {
+      lines.push(`- **${a.name}** (${a.kind}): claims from ${a.workCount} works`);
+    }
+    lines.push('');
   }
   return lines.join('\n');
 }

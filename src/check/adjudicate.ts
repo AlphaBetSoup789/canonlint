@@ -16,6 +16,9 @@ export const ADJUDICATION_VERDICTS = [
 
 export type AdjudicationVerdict = (typeof ADJUDICATION_VERDICTS)[number];
 
+/** Below this, identity doubt routes to Uncertain — never Contradictions. */
+export const SAME_ENTITY_CONFIDENCE_THRESHOLD = 0.7;
+
 const AdjudicationSchema = z.object({
   verdict: z.enum(ADJUDICATION_VERDICTS),
   severity: z.enum(['low', 'medium', 'high']).default('medium'),
@@ -23,6 +26,12 @@ const AdjudicationSchema = z.object({
   /** Required when verdict is contradiction or timeline. */
   canon_claim_id: z.number().int().positive().nullable().optional(),
   summary: z.string().min(1).optional(),
+  /**
+   * Confidence that draft and cited canon claim concern the same entity.
+   * Defaults to 1 when omitted (back-compat with older mocks); live models
+   * must emit it — low values are downgraded by enforcePrecision.
+   */
+  same_entity_confidence: z.number().min(0).max(1).default(1),
 });
 
 export type Adjudication = z.infer<typeof AdjudicationSchema>;
@@ -30,13 +39,14 @@ export type Adjudication = z.infer<typeof AdjudicationSchema>;
 export const ADJUDICATE_JSON_SCHEMA: Record<string, unknown> = {
   type: 'object',
   additionalProperties: false,
-  required: ['verdict', 'severity', 'explanation'],
+  required: ['verdict', 'severity', 'explanation', 'same_entity_confidence'],
   properties: {
     verdict: { type: 'string', enum: [...ADJUDICATION_VERDICTS] },
     severity: { type: 'string', enum: ['low', 'medium', 'high'] },
     explanation: { type: 'string', minLength: 1 },
     canon_claim_id: { type: ['integer', 'null'] },
     summary: { type: 'string' },
+    same_entity_confidence: { type: 'number', minimum: 0, maximum: 1 },
   },
 };
 
@@ -56,9 +66,16 @@ export const ADJUDICATE_INSTRUCTIONS = [
   'Precision rules (mandatory):',
   '- Only return contradiction or timeline if you can cite a specific candidate',
   "  by canon_claim_id AND that candidate's excerpt supports the conflict.",
+  '- same_entity_confidence (0..1, required): how sure you are that the draft',
+  '  and the cited canon claim are about the SAME entity. If you suspect the',
+  '  draft was bound to the wrong person/place, set this LOW and prefer',
+  '  needs_human — never emit contradiction when identity is in doubt.',
   '- If unsure, return needs_human. A false contradiction is worse than a miss.',
   '- Modalities matter: a believed/reported/lie claim in canon is weaker ground',
-  '  for contradiction than an asserted fact.',
+  '  for contradiction than an asserted fact. Never use figurative claims.',
+  '- summary: one concrete line naming the conflict',
+  '  (e.g. "Watson\'s war wound moves from shoulder to leg").',
+  '  Never use the bare word "contradiction" as the summary.',
   '- Output JSON only.',
 ].join('\n');
 
@@ -97,12 +114,13 @@ function parseAdjudication(text: string): Adjudication {
 }
 
 /**
- * Enforce precision: contradiction/timeline without a valid cited canon claim
- * are downgraded to needs_human.
+ * Enforce precision: contradiction/timeline without a valid cited canon claim,
+ * or with weak same-entity confidence, are downgraded to needs_human.
  */
 export function enforcePrecision(
   adjudication: Adjudication,
   candidates: CitedClaim[],
+  threshold = SAME_ENTITY_CONFIDENCE_THRESHOLD,
 ): Adjudication {
   if (adjudication.verdict !== 'contradiction' && adjudication.verdict !== 'timeline') {
     return adjudication;
@@ -118,6 +136,16 @@ export function enforcePrecision(
         adjudication.explanation +
         ' [downgraded: contradiction/timeline requires a cited canon excerpt]',
       canon_claim_id: null,
+    };
+  }
+  if (adjudication.same_entity_confidence < threshold) {
+    return {
+      ...adjudication,
+      verdict: 'needs_human',
+      explanation:
+        adjudication.explanation +
+        ` [downgraded: same_entity_confidence ${adjudication.same_entity_confidence} ` +
+        `< ${threshold}]`,
     };
   }
   return adjudication;
@@ -145,6 +173,24 @@ export function toConflictKind(verdict: AdjudicationVerdict): ConflictKind | nul
 
 export function defaultSummary(draft: ExtractedClaim, entityName: string): string {
   return `${entityName}'s ${draft.attribute} is ${draft.value}.`;
+}
+
+/** Reject bare "contradiction" / empty titles from the model. */
+export function effectiveSummary(
+  adjudication: Adjudication,
+  draft: ExtractedClaim,
+  entityName: string,
+): string {
+  const raw = adjudication.summary?.trim() ?? '';
+  if (
+    raw === '' ||
+    /^contradiction\.?$/i.test(raw) ||
+    /^timeline\.?$/i.test(raw) ||
+    /^timeline issue\.?$/i.test(raw)
+  ) {
+    return defaultSummary(draft, entityName);
+  }
+  return raw;
 }
 
 export async function adjudicateClaim(
@@ -194,6 +240,7 @@ export async function adjudicateClaim(
         severity: 'medium' as Severity,
         explanation: 'Model refused to adjudicate.',
         canon_claim_id: null,
+        same_entity_confidence: 0,
       },
       usage,
       refused: true,
@@ -211,6 +258,7 @@ export async function adjudicateClaim(
         severity: 'medium',
         explanation: 'Could not parse adjudication response.',
         canon_claim_id: null,
+        same_entity_confidence: 0,
       },
       usage,
       refused: false,

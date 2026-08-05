@@ -33,6 +33,7 @@ describe('enforcePrecision', () => {
         severity: 'high',
         explanation: 'Looks wrong',
         canon_claim_id: null,
+        same_entity_confidence: 1,
       },
       [cited({ id: 1 })],
     );
@@ -46,23 +47,39 @@ describe('enforcePrecision', () => {
         severity: 'medium',
         explanation: 'Order is off',
         canon_claim_id: 99,
+        same_entity_confidence: 1,
       },
       [cited({ id: 1 })],
     );
     expect(result.verdict).toBe('needs_human');
   });
 
-  it('keeps contradiction when the citation is valid', () => {
+  it('keeps contradiction when the citation is valid and identity is confident', () => {
     const result = enforcePrecision(
       {
         verdict: 'contradiction',
         severity: 'high',
         explanation: 'Solicitor ≠ physician',
         canon_claim_id: 1,
+        same_entity_confidence: 0.95,
       },
       [cited({ id: 1 })],
     );
     expect(result.verdict).toBe('contradiction');
+  });
+
+  it('downgrades when same_entity_confidence is below threshold', () => {
+    const result = enforcePrecision(
+      {
+        verdict: 'contradiction',
+        severity: 'high',
+        explanation: 'Looks like a different person',
+        canon_claim_id: 1,
+        same_entity_confidence: 0.2,
+      },
+      [cited({ id: 1 })],
+    );
+    expect(result.verdict).toBe('needs_human');
   });
 });
 
